@@ -16,7 +16,7 @@ money > 0 ~* Has Money -> Not Broke
 
 In this case, the soft dash "~" indicates that the state is not consumed, which means that the trigger `Has Money` will be raised on every step of the machine where the value of `money` is greater than 0.
 
-Note that in order for a rulee to be executed, all conditional states within the rule must evaluate to True.
+Note that in order for a rule to be executed, all conditional states within the rule must evaluate to True.
 
 ## Holding States
 
@@ -42,7 +42,9 @@ With this change, the system will record the time that the button was pressed (b
 
 ## Action States
 
-Action states are a special class of state that produces side effects.  They are exclusively comprised of [assignment expressions](Expressions.md#Assignment_Expressions) or [function expressions](Expressions.md#Function_Expressions) and are indicated using the left-hand `-@` operator.
+Action states are a special class of state that produces transformations and side effects.  They are exclusively comprised of [assignment expressions](Expressions.md#Assignment_Expressions) or [function expressions](Expressions.md#Function_Expressions) and are indicated using the left-hand `-@` operator.
+
+Action states allow alterations to be made to the context, and also specify by default the NO-CACHE flag for action states where there is only a function expression.  This behavior can be overridden using the CACHE flag in the action state.
 
 In order for the action described by an action state to be taken, it must be accepted according to its **Priority and Weight**(see [Assignments and Keyflags](Assignments%20and%20Keyflags.md)).  If the change is **Rejected** subsequent actions and transitions will not be executed.
 
@@ -84,6 +86,7 @@ In this case, whichever rule gets selected will be the only one that impacts the
 
 * there is a 0.5 probability that the machine will have incremented the score by 1, and `Scored a Point`, it's Lucky state will remain active, and `Got a lucky shot` will remain inactive
 * there is a 0.5 probability that the machine will have incremented the score by 2, and `Got a lucky shot`, it will no longer be `Lucky` and it will not have `Scored A Point`.
+
 
 
 ## Fork States

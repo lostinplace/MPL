@@ -14,5 +14,4 @@ The following rules are used in priority order to determine the types of symbols
 0. Any undefined symbols in a **Condition Expression** will be defined as `CONTEXT` with a type flag correlated with the value being compared.
    1. Competing value types will cause an error at policy evaluation time
 
-
  

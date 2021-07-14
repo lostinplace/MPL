@@ -53,12 +53,18 @@ The following types are available:
 ```
 MACHINE
 STATE
-  Flags: EXCLUSIVE, BLOCKING
 TRIGGER
-  Flags: INT, DOUBLE, STRING, TIME, SET, DICT[TYPE,TYPE], BOOL
-CONTEXT
-  Flags: INT, DOUBLE, STRING, TIME, SET, DICT[TYPE,TYPE], BOOL, FUNC[INPUTS][OUTPUTS], MACHINE[Path/Name], Warn, Allow, Reject, Resolve, Deny
+INT
+DOUBLE
+STRING
+SET
+DICT
+BOOL
+MACHINE
+FUNC
 ```
+
+More details are available in the [Types](./Types.md) section.
 
 The MACHINE and STATE definitions allow child policies using leading white space.  This is best explained with an example:
 
@@ -179,7 +185,47 @@ Foo ~> Bar
 
 This says that as long as the state `Foo` is activated, the state `Bar` should be activated.  This transition does not consume the `Foo` state, meaning it will remain active after the transition occurs
 
+## Relational Pathing
 
+Since the context of a Machine can include references to other machines as well as nested data structures, the following relative pathing rules are available:
+
+### Triggers
+Triggers are accessible using the `.` Operator. Note that triggers can be observed from anywhere, but can only be raised by the Machine that defined them.
+
+For Example:
+
+```mpl
+Box: MACHINE
+  Shaken *-* Shaking
+  
+Heater: MACHINE
+  My Box : MACHINE {SRC:Box}
+  
+  My Box.Shook *-@ print("I'm being shaken")
+```
+
+### States
+States are observable to any other machine, but again, they cannot be activated or deactivated through consumption of a state unless the CONSUMES flag allows this behavior.  They are accessible using the 
+
+For Example:
+
+```mpl
+Box: MACHINE
+  Contents: MACHINE {SRC: Stuff, CONSUMES:[Temperature/ALL], PRODUCES:[Heating]}
+  Warm: Temperature
+  Cold: Temperature
+  
+  EVERY(10s) *-@ temp = ReadSensor() {NO-CACHE} -> temp < 20 -> Cold
+  Contents.Heating *-> Warm
+  
+Heater: MACHINE
+  My Box : MACHINE {SRC:Box, PRODUCES:[Temperature/ALL]}
+  ENTER -> Off
+  On: Power
+  Off: Power
+  My Box/Temperature/Cold -* Heating -> On
+  My Box/Temperature/Warm -> Off
+```
 
 ## Steps
 

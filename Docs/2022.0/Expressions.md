@@ -46,6 +46,8 @@ Note that this state expression includes a reference to a trigger to the left ha
 
 Function expressions are a type of expression that calls a function provided by the context with arguments available to the machine at step time.  The value returned by the function is made available to the interpreter.
 
+Please note that by default, function evaluations are cached (unless they are the sole component of an action state), meaning that calling them with the same arguments will produce the same result, even if the host systems execution of the function has changed, to override this use the NO-CACHE flag.
+
 #### Operators
 
 `()`
@@ -56,12 +58,16 @@ LHS: CONTEXT(FUNC)
 
 RHS: [ANY]
 
+#### Flags
+
+CACHE, NO-CACHE
+
 #### Examples
 
 ```
 A(B)
 
-FetchFromInternet("ID", url) 
+FetchFromInternet("ID", url) {NO-CACHE}
 ```
 
 

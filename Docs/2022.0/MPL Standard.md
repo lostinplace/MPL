@@ -144,6 +144,18 @@ Triggers are a special class of state that are used for communication between ma
 
 Importantly, triggers may optionally specify a `VALUE` when they are raised, and this value will be available to the rest of the rule for the duration of its execution by using the `VALUE` keyword.
 
+### Special Triggers
+
+#### EVERY
+The `EVERY` trigger accepts a time unit as an argument, and will present its self on every step after that interval has passed.  Please not that if this interval has been greatly exceeded, the trigger won't occur multiple times
+
+For Example:
+
+```mpl
+Another One Bites The Dust: MACHINE
+  EVERY(500ms) *-@ print("Another One Gone") -> Sang It
+```
+
 ## Rules
 
 Every state machine's policy is composed of definitions or Rules.  Definitions identify symbols that will be used within the Machine's policy, while rules describe the transitions that occur between states.
@@ -211,20 +223,26 @@ For Example:
 
 ```mpl
 Box: MACHINE
-  Contents: MACHINE {SRC: Stuff, CONSUMES:[Temperature/ALL], PRODUCES:[Heating]}
-  Warm: Temperature
-  Cold: Temperature
+  Contents: MACHINE {SRC: Stuff, CONSUMES:[Extreme Temp/ALL], PRODUCES:[On, Off]}
+  Too Hot: Extreme Temp
+  Too Cold: Extreme Temp
   
-  EVERY(10s) *-@ temp = ReadSensor() {NO-CACHE} -> temp < 20 -> Cold
-  Contents.Heating *-> Warm
+  EVERY(10s) *-@ temp = ReadSensor() {NO-CACHE} |-> temp < 20 -> Need Heat
+                                                |-> temp > 40 -> Need Cooling
+                                                |-> 20 <= temp <= 40 -> !Extreme Temp
+  
+  Contents/On ~> Contents Active
+  Contents/Off ~> !Contents Active
   
 Heater: MACHINE
-  My Box : MACHINE {SRC:Box, PRODUCES:[Temperature/ALL]}
+  My Box : MACHINE {SRC:Box, PRODUCES:[Extreme Temp/ALL]}
   ENTER -> Off
   On: Power
   Off: Power
-  My Box/Temperature/Cold -* Heating -> On
-  My Box/Temperature/Warm -> Off
+  
+  On ~@ AddHeatWatts(1)
+  My Box/Extreme Temp/Need Cooling -> Off
+  My Box/Extreme Temp/Need Heat -> On
 ```
 
 ## Steps

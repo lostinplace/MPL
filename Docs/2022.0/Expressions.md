@@ -54,9 +54,7 @@ Please note that by default, function evaluations are cached (unless they are th
 
 #### Operands
 
-LHS: CONTEXT(FUNC) 
-
-RHS: [ANY]
+FUNC
 
 #### Flags
 
@@ -81,7 +79,7 @@ Arithmetic Expressions perform basic arithmetic using provided symbols and value
 
 #### Operands
 
-CONTEXT(INT|DOUBLE), Values, Arithmetic Expressions
+INT, DOUBLE, Values, Arithmetic Expressions
 
 #### Example
 
@@ -103,7 +101,7 @@ Comparison expressions are a type of expression that evaluates a statement as ei
 
 #### Operands
 
-CONTEXT(ANY), Values(NUMERIC and STRING), Arithmetic Expressions
+ANY, Values, Arithmetic Expressions
 
 #### Example
 
@@ -125,7 +123,7 @@ Logical expressions are a type of expression that evaluates a statement as eithe
 
 #### Operands
 
-CONTEXT(BOOL), State Expression, Comparison Expressions, Logical Expressions
+BOOL, State Expression, Comparison Expressions, Logical Expressions
 
 #### Examples
 
@@ -149,9 +147,9 @@ Assignment expressions are a type of expression that assigns the value of the ri
 
 #### Operands
 
-LHS: CONTEXT(ANY)
+LHS: ANY
 
-RHS: CONTEXT(ANY), Arithmetic Expression, Logical Expression, Comparison Expression, State Expression, Function Expression
+RHS: ANY, Arithmetic Expression, Logical Expression, Comparison Expression, State Expression, Function Expression
 
 #### Examples
 

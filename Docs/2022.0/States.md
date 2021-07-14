@@ -1,3 +1,7 @@
+# States
+
+Note that this document makes extensive use of [MPL Operators](./Operators.md), and you should familiarize yourself with them before proceeding
+
 ## Conditional States
 
 Conditional states are a special class of state that are synthesized from [logical expressions](./Expressions.md).  Consider the following:
@@ -74,7 +78,7 @@ Since no priorities or weights are specified, there is a 0.5 probability that th
 Contrast this with the following:
 
 ```
-score: CONTEXT{Reject}
+score: INT {Reject}
 
 Ball Passed *-> In Scoring Position ~> Shoot(VALUE) -@ score += 1 -> Scored A Point
 
@@ -92,6 +96,8 @@ In this case, whichever rule gets selected will be the only one that impacts the
 ## Fork States
 
 Sometimes there are repetitive states that have the same general criteria for starting, but differ in their eeveentual destination based on logic or selection.  To simplify this, we can use **Fork States**
+
+It is important to note that if any successful fork state consumes the the source state using a consuming operator (`-` instead of `~`) the event is consumed
 
 Consider the following example:
 

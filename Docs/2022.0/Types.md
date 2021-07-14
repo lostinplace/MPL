@@ -6,7 +6,7 @@ This is the list of types that is supported by MPL
 MACHINE
   Flags: SRC:[Path/Name], CONSUMES:[STATES], PRODUCES:[STATES], Warn, Allow, Reject, Resolve, Deny
 STATE
-  Flags: EXCLUSIVE, BLOCKING
+  Flags: Exclusive, Blocking
 TRIGGER
   Flags: INT, DOUBLE, STRING, DICT[TYPE,TYPE], BOOL 
 LIST:

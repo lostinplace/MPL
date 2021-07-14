@@ -71,12 +71,12 @@ The MACHINE and STATE definitions allow child policies using leading white space
 ```mpl
 Car: MACHINE
   Running: STATE
-  Driving: STATE(BLOCKING)
+  Driving: STATE {BLOCKING}
   Empty: STATE
   Radio: STATE
-    On: STATE(EXCLUSIVE)
-    Off: STATE(EXCLUSIVE)
-  Fuel: CONTEXT(DOUBLE)
+    On: STATE {Exclusive}
+    Off: STATE {Exclusive}
+  Fuel: DOUBLE
   Ignition: TRIGGER
 ```
 
@@ -137,6 +137,9 @@ Cat in a Sealed Box: MACHINE
 ```
 
 The above policy describes a state machine for a theoretical cat in a sealed box.  This cat can be, "Alive", "Dead", or both "Alive and Dead at the same time".  The above policy also describes two emotional states that are exculsive substates of "Emotion".  This means that if the cat has an "Emotion" it can either be "Happy" or "Bored", but it cannot be both at the same time.
+
+For more information on this topic see the section on [States](./States.md)
+
 
 ## Triggers
 
@@ -223,7 +226,7 @@ For Example:
 
 ```mpl
 Box: MACHINE
-  Contents: MACHINE {SRC: Stuff, CONSUMES:[Extreme Temp/ALL], PRODUCES:[On, Off]}
+  Contents: MACHINE {SRC: Heater, CONSUMES:[Extreme Temp/ALL], PRODUCES:[On, Off]}
   Too Hot: Extreme Temp
   Too Cold: Extreme Temp
   

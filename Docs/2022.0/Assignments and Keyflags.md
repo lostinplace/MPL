@@ -21,7 +21,7 @@ Please note that all assignments have a default priority of 0 and weight of 1.0.
 Priority is a signed int8 value (-128 to 127) that determines the order that a collection of assignments should be executed in, from highest to lowest.  Take the following assignments for example:
 
 ```
-a: CONTEXT{INT, Allow}
+a: INT  {Allow}
 
 a = 1 {1, 1.0}
 a += 2 {2, 0.5}

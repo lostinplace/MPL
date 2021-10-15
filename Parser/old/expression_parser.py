@@ -3,8 +3,78 @@ from dataclasses import dataclass
 from parsita import *
 from parsita.util import splat
 
-from Parser.CustomParsers import excluding, at_least, check, debug, best
-from Parser.arrow_parser import ArrowParser
+from lib.CustomParsers import excluding, at_least, check, debug, best
+from Parser.old.arrow_parser import ArrowParser
+
+"""
+
+# Expressions
+
+NUMBER = r/^((?!-0?(\.0+)?(e|$))-?(0|[1-9]\d*)?(\.\d+)?(?<=\d)(e-?(0|[1-9]\d*))?|0x[0-9a-f]+)$/
+
+Numeric_Expression(content:String)
+
+RESERVED = r/^[A-Z]+$/
+
+Reserved(content:String)
+
+STRING = r/`([^`]|\\`)*`/
+
+String_Expression(content:String)
+
+LABEL = r/\w/ & NOT(OPERATOR or : or ,)+ OPT(:\w+) 
+
+Label_Expression(content:String, type: String)
+
+Index_Operand: U(Number, Label_Expression, String_Expression, Arithmetic_Expression)
+
+INDEX_EXPRESSION= LABEL[Index_Operand] OPT(:\w+)
+
+Index_Expression(label: Label_Expression, index: Index_Operand)
+
+METHOD_INVOCATION = LABEL(repsep(Index_Operand, ",") ) OPT(:\w+)
+
+Argument(value: Index_Operand)
+
+Method_Invocation()
+
+method
+
+VARIABLE = [\w\s] until OPERATOR
+
+Arithmetic_Operators: * / - + ^ % ()
+
+ARITHMETIC_EXPRESSION = (NUMBER | VARIABLE | ARITHMETIC_EXPRESSION) Arithmetic_Operator (NUMBER | VARIABLE | ARITHMETIC_EXPRESSION)
+
+Arithmetic_Operand:U(Number,Variable,ArithmeticExpression)
+
+Arithmetic_Expression(Arithmetic_Operand, Arithmetic_Operand, Arithmetic_Operator)
+
+EQUALITY_OPERATORS = == !=
+
+LOGICAL_OPERATORS = && ||
+
+EQUALITY_EXPRESSION = (NUMBER | VARIABLE | ARITHMETIC_EXPRESSION | EQUALITY_EXPRESSION) Logical_Operator (NUMBER | VARIABLE | ARITHMETIC_EXPRESSION | EQUALITY_EXPRESSION)
+
+Equality_Operand:U(Number | Variable | Arithmetic_Expression | Equality_Expression)
+
+Equality_Expression(Equality_Operand, Equality_Operand, Logical_Operator)
+
+STATE_OPERATORS = AND OR
+
+STATE_EXPRESSION = VARIABLE
+
+LOGICAL_EXPRESSION =  VARIABLE
+
+
+LOGICAL_EXPRESSION = AR
+
+Produces
+
+Variable = NOT  
+
+"""
+
 
 
 @dataclass()

@@ -30,7 +30,7 @@ a = 5 {3}
 Note: If a single number is provided in braces, integers are evaluated as priority with a default weight of 1.0
 ```
 
-If these assignments were to be queued for execution at the end of a Machine's step, the resulting value would be `a==1`  since the assignment `a=5` gets processed first, `a+=2` is next resulting in `a==7`, but then both operations are overwritten by the assignment `a=1` 
+If these assignments were to be queued for execution at the end of a Machine's step, the resulting value would be `a==7`.  Since direct assignment using the equals `=` operator competes based on priority, It is evaluated first.  The assignment `a=5` gets  processed because it is highest priority, `a+=2` is next resulting in `a==7`.
 
 ### Weight
 

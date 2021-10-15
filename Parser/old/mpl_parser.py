@@ -3,12 +3,11 @@ from dataclasses import replace
 from parsita import *
 from parsita.util import splat
 
-from Parser.CustomParsers import debug
-from Parser.mpl_parser_classes import Declaration, Event, State, default_state, Machine, Rule, Transition, \
-    TransitionType, Trigger
+from Parser.old.mpl_parser_classes import Declaration, Event, State, default_state, Machine, Rule, Transition, \
+    Trigger
 
-from Parser.expression_parser import ExpressionParsers as E, Label, Expression
-from Parser.arrow_parser import ArrowParser as A, Arrow
+from Parser.old.expression_parser import ExpressionParsers as E, Label
+from Parser.old.arrow_parser import ArrowParser as A, Arrow
 
 
 def process_declaration(name: Label, type: Label) -> Declaration:
@@ -32,7 +31,7 @@ def process_declaration(name: Label, type: Label) -> Declaration:
 
 ### identify is left, and act is right
 def process_mpl_rule(operations) -> Rule:
-    from Parser.mpl_parser_classes import TransitionType as TT
+    from Parser.old.mpl_parser_classes import TransitionType as TT
     queue = list()
     operand_type = None
     operation = None

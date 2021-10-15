@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 from parsita import Success, Parser
 
-from Parser.expression_parser import ExpressionParsers, Any, Label
-from Parser.mpl_parser import process_declaration
-from Parser.mpl_parser_classes import Declaration, Event, State, default_state, Rule
+from Parser.old.expression_parser import ExpressionParsers, Any, Label
+from Parser.old.mpl_parser import process_declaration
+from Parser.old.mpl_parser_classes import Declaration, State, default_state, Rule
 
 
 def eval_match(parser, statement, expectation):
@@ -77,8 +77,8 @@ class Result:
 
 
 def test_basic_mpl_parsing():
-    from Parser.mpl_parser import MPLParser as M
-    from Parser.mpl_parser_classes import Transition as TRANS, TransitionType as TT, Trigger as TRIG
+    from Parser.old.mpl_parser import MPLParser as M
+    from Parser.old.mpl_parser_classes import Transition as TRANS, TransitionType as TT, Trigger as TRIG
 
     expressions = [
         E("foo:STATE", M.declaration, Declaration(default_state('foo'))),

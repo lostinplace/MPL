@@ -1,4 +1,4 @@
-from typing import Generic, Sequence
+from typing import Generic, Sequence, Union, Callable
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.parsers import AlternativeParser
@@ -35,11 +35,11 @@ class ExcludingParser(Generic[Input, Output], Parser[Input, Input]):
         return Backtrack(reader, self.name_cb)
 
     def __repr__(self):
-        return self.name_or_nothing() + 'not({})'.format(repr(self.parser))
+        return self.name_or_nothing() + 'excluding({})'.format(repr(self.parser))
 
 
 def excluding(parser: Parser[Input, Output]) -> ExcludingParser:
-    """Match all except that which matches the provided parser
+    """Match anything unless it matches the provided parser
 
     This matches all text until text that is matched by the provided parser is encountered.
 
@@ -115,7 +115,7 @@ class CheckParser(Generic[Input, Output], Parser[Input, Input]):
 def check(parser: Parser[Input, Output]) -> ExcludingParser:
     """Evaluates to see if you're on the right track without consuming input
 
-    This will match text against the provided parser, and accept if that parcer can move forward, else it will backtrack
+    This will match text against the provided parser, and continue if that parser can move forward, else it will backtrack
 
     Args:
         :param parser: a parser that parses terms that you want to make sure are present
@@ -126,18 +126,22 @@ def check(parser: Parser[Input, Output]) -> ExcludingParser:
 
 
 class DebugParser(Generic[Input, Output], Parser[Input, Input]):
-    def __init__(self, parser: Parser[Input, Output], verbose: bool = False):
+    def __init__(
+            self, parser: Parser[Input, Output], verbose: bool = False,
+            callback: Callable[[Parser[Input, Input], Reader[Input]], None] = None
+    ):
         super().__init__()
         self.parser = parser
         self.parserdef = repr(parser)
         self.name_cb = lambda: f"to see {self.parserdef} before moving on"
         self.verbose = verbose
-        self.breakpoint = breakpoint
+        self.callback = callback
 
     def consume(self, reader: Reader[Input]):
-        evaluating = reader.source[reader.position:reader.position + 5]
-        breakpoint()
+        if self.callback:
+            self.callback(self.parser, reader)
         if self.verbose:
+            evaluating = reader.source[reader.position:reader.position + 5]
             print(f"""EVALUATING "{evaluating}..." FOR PARSER {self.parserdef}""")
             result = self.parser.consume(reader)
             print(f"""RESULT {repr(result)}""")
@@ -150,19 +154,24 @@ class DebugParser(Generic[Input, Output], Parser[Input, Input]):
         return self.name_or_nothing() + 'debug({})'.format(repr(self.parser))
 
 
-def debug(parser: Parser[Input, Output], verbose: bool = False) -> DebugParser:
-    """Lets you set breakpoints at print parser progress
+def debug(
+        parser: Parser[Input, Output], verbose: bool = False,
+        callback: Callable[[Parser[Input, Input], Reader[Input]], None]  = None
+) -> DebugParser:
+    """Lets you set breakpoints and print parser progress
 
-    This will match text against the provided parser, and accept if that parcer can move forward, else it will backtrack
+    You can use the verbose flag to print messages as the parser is being evaluated
+
+    You can use the callback method to insert a callback that will execute before the parser is evaluated, the call will include the reader
 
     Args:
-        :param verbose: write progress messages to stdout
-        :param breakpoint: set a breakpoint during execution
         :param parser: a parser that parses terms that you want to make sure are present
+        :param verbose: write progress messages to stdout
+        :param callback: calls this function before evaluating the provided parser
     """
     if isinstance(parser, str):
         parser = lit(parser)
-    return DebugParser(parser, verbose)
+    return DebugParser(parser, verbose, callback)
 
 
 class BestAlternativeParser(Generic[Input, Output], Parser[Input, Output]):
@@ -190,13 +199,13 @@ class BestAlternativeParser(Generic[Input, Output], Parser[Input, Output]):
         for parser in self.parsers:
             names.append(parser.name_or_repr())
 
-        return f"greedy({'|'.join(names)})"
+        return f"best({'|'.join(names)})"
 
 
 def best(*parsers: Parser[Input, Output]) -> BestAlternativeParser:
-    """Will return the furthest prgoress from any list of parsers
+    """Will return the furthest progress from any list of parsers
 
-    This will try each parsere provided, and return the result of the one that made it the farthest
+    This will try each parser provided, and return the result of the one that made it the farthest
 
     Args:
         :param parsers: a list of parsers or a single AlternativeParser
@@ -212,3 +221,95 @@ def best(*parsers: Parser[Input, Output]) -> BestAlternativeParser:
     if len(processed_parsers) == 1 and isinstance(first_parser, AlternativeParser):
         processed_parsers = first_parser.parsers
     return BestAlternativeParser(*processed_parsers)
+
+
+class TrackParser(Generic[Input, Output], Parser[Input, Input]):
+    def __init__(self, parser: Parser[Input, Output]):
+        super().__init__()
+        self.parser = parser
+        parserdef = repr(parser)
+        self.name_cb = lambda: f"tracking the depth of {parserdef} before moving on"
+        self.length = len(repr(parser))
+
+    def consume(self, reader: Reader[Input]):
+        result = self.parser.consume(reader)
+        if isinstance(result, Continue):
+            return Continue(result.remainder, [reader.position, result.value])
+        return result
+
+    def __repr__(self):
+        return self.name_or_nothing() + 'track({})'.format(repr(self.parser))
+
+
+def track(parser: Parser[Input, Output]) -> ExcludingParser:
+    """Tracks the current depth of the start of the successful parser
+
+    This will match text against the provided parser, and accept if that parser can move forward, else it will backtrack.
+    the result it returns will include an integer that specifies the depth that the match began
+
+    Args:
+        :param parser: a parser that parses terms that you want to make sure are present
+    """
+    if isinstance(parser, str):
+        parser = lit(parser)
+    return TrackParser(parser)
+
+
+class RepeatWithKeptSeparatorsParser(Generic[Input, Output], Parser[Input, Sequence[Output]]):
+    def __init__(self, parser: Parser[Input, Output], separator: Parser[Input, Output]):
+        super().__init__()
+        self.parser = parser
+        self.separator = separator
+
+    def consume(self, reader: Reader[Input]):
+        status = self.parser.consume(reader)
+
+        if not isinstance(status, Continue):
+            return Continue(reader, []).merge(status)
+        else:
+            output = [status.value]
+            remainder = status.remainder
+            while True:
+                # If the separator matches, but the parser does not, the remainder from the last successful parser step
+                # must be used, not the remainder from any separator. That is why the parser starts from the remainder
+                # on the status, but remainder is not updated until after the parser succeeds.
+                status = self.separator.consume(remainder).merge(status)
+                if isinstance(status, Continue):
+                    last_match = output.pop()
+                    separator_value = status.value
+                    result = (last_match, separator_value)
+                    status = self.parser.consume(status.remainder).merge(status)
+                    if isinstance(status, Continue):
+                        if remainder.position == status.remainder.position:
+                            raise RuntimeError(remainder.recursion_error(str(self)))
+
+                        remainder = status.remainder
+                        output.append(result)
+                        output.append(status.value)
+                    else:
+                        return Continue(remainder, output).merge(status)
+                else:
+                    return Continue(remainder, output).merge(status)
+
+    def __repr__(self):
+        return self.name_or_nothing() + f"repsep({self.parser.name_or_repr()}, {self.separator.name_or_repr()})"
+
+
+def repwksep(
+    parser: Union[Parser, Sequence[Input]], separator: Union[Parser, Sequence[Input]]
+) -> RepeatWithKeptSeparatorsParser:
+    """Match a parser zero or more times separated by another parser, and keeps the separators.
+
+    This matches repeated sequences of ``parser`` separated by ``separator``. A
+    list is returned containing tuples of matched values and separators If there are no matches, an empty
+    list is returned.
+
+    Args:
+        parser: Parser or literal
+        separator: Parser or literal
+    """
+    if isinstance(parser, str):
+        parser = lit(parser)
+    if isinstance(separator, str):
+        separator = lit(separator)
+    return RepeatWithKeptSeparatorsParser(parser, separator)

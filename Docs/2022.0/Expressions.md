@@ -75,7 +75,7 @@ Arithmetic Expressions perform basic arithmetic using provided symbols and value
 
 #### Operators
 
-`+` `-` `*` `/` `^` `()`
+`+` `-` `*` `/` `^` `()` `%`
 
 #### Operands
 

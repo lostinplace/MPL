@@ -129,6 +129,8 @@ using this syntax, the driver can express a priority level for either left or ri
 
 Timed states are a way of communicating the passage of time in state transitions.  These are communicated using descending order time unit notation, and are evaluated as conditional expressions that will only evaluate to true once the specified unit of time has passed.
 
+Note that in order for a time state to be activated, its implied condition must be active for the entire duration (this can be avoided using a holding state).
+
 The available time units are
 
 | Abbreviation | Unit     |

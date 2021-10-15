@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Type, Optional, Union
-from Parser.expression_parser import Label, Assignment, Expression
+from Parser.old.expression_parser import Label, Assignment, Expression
 from enum import Enum
 
 

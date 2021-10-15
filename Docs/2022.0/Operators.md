@@ -8,13 +8,14 @@ The general anatomy of a transition operator follows the following rules:
 
 * An operation is defined by the operator on its left, unless it is the originating trigger for a rule in which case it is defined by the * on its right
 * an asterisk `*` represents a trigger
-* a hard-dash `-` represeents a consuming transition
+* a hard-dash `-` represents a consuming transition
 * a soft-dash `~` represents an "observing" or non-consuming transition
 * an arrow `>` represents a conditional state or state expression
 * an at-sign `@` represents an action state
-* a left or-sign `|` is used to indicate a fork state
+* a pipe `|` on the left is used to indicate a fork state
 
-Some examples are provided here:
+
+### Examples
 
 ```mpl
 

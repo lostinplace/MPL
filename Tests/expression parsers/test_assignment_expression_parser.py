@@ -24,6 +24,6 @@ def test_assignment_expression_parsers():
     }
 
     results = collect_parsing_expectations(expectations, AssignmentExpressionParsers.expression)
-    for actual, expected, input in results:
-        assert actual == expected
+    for result in results:
+        assert result.actual == result.expected
 

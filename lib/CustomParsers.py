@@ -1,4 +1,5 @@
-from typing import Generic, Sequence, Union, Callable
+import math
+from typing import Generic, Sequence, Union, Callable, Optional, List, Any
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.parsers import AlternativeParser
@@ -125,49 +126,58 @@ def check(parser: Parser[Input, Output]) -> ExcludingParser:
     return CheckParser(parser)
 
 
-class DebugParser(Generic[Input, Output], Parser[Input, Input]):
+class DebugParser(Generic[Input, Output], Parser[Input, Output]):
     def __init__(
-            self, parser: Parser[Input, Output], verbose: bool = False,
-            callback: Callable[[Parser[Input, Input], Reader[Input]], None] = None
+        self,
+        parser: Parser[Input, Output],
+        verbose: bool = False,
+        callback: Callable[[Parser[Input, Output], Reader[Input]], None] = None,
     ):
         super().__init__()
         self.parser = parser
-        self.parserdef = repr(parser)
-        self.name_cb = lambda: f"to see {self.parserdef} before moving on"
         self.verbose = verbose
         self.callback = callback
+        self._parser_string = repr(parser)
 
     def consume(self, reader: Reader[Input]):
+        if self.verbose:
+            print(f"""Evaluating token {reader.next_token()} using parser {self._parser_string}""")
+
         if self.callback:
             self.callback(self.parser, reader)
+
+        result = self.parser.consume(reader)
+
         if self.verbose:
-            evaluating = reader.source[reader.position:reader.position + 5]
-            print(f"""EVALUATING "{evaluating}..." FOR PARSER {self.parserdef}""")
-            result = self.parser.consume(reader)
-            print(f"""RESULT {repr(result)}""")
-            return result
-        else:
-            result = self.parser.consume(reader)
-            return result
+            print(f"""Result {repr(result)}""")
+
+        return result
 
     def __repr__(self):
-        return self.name_or_nothing() + 'debug({})'.format(repr(self.parser))
+        return self.name_or_nothing() + f"debug({self.parser.name_or_repr()})"
 
 
 def debug(
-        parser: Parser[Input, Output], verbose: bool = False,
-        callback: Callable[[Parser[Input, Input], Reader[Input]], None]  = None
+    parser: Parser[Input, Output],
+    *,
+    verbose: bool = False,
+    callback: Optional[Callable[[Parser[Input, Input], Reader[Input]], None]] = None,
 ) -> DebugParser:
-    """Lets you set breakpoints and print parser progress
-
-    You can use the verbose flag to print messages as the parser is being evaluated
-
-    You can use the callback method to insert a callback that will execute before the parser is evaluated, the call will include the reader
-
+    """Execute debugging hooks before a parser.
+    This parser is used purely for debugging purposes. From a parsing
+    perspective, it behaves identically to the provided ``parser``, which makes
+    ``debug`` a kind of harmless wrapper around a another parser. The
+    functionality of the ``debug`` comes from providing one or more of the
+    optional arguments.
     Args:
-        :param parser: a parser that parses terms that you want to make sure are present
-        :param verbose: write progress messages to stdout
-        :param callback: calls this function before evaluating the provided parser
+        parser: Parser or literal
+        verbose: If True, causes a message to be printed containing the
+            representation of ``parser`` and the next token before the
+            invocation of ``parser``. After ``parser`` returns, the
+            ``ParseResult`` returned is printed.
+        callback: If not ``None``, is invoked immediately before ``parser`` is
+            invoked. This allows the use to inspect the state of the input or
+            add breakpoints before the possibly troublesome parser is invoked.
     """
     if isinstance(parser, str):
         parser = lit(parser)
@@ -180,19 +190,26 @@ class BestAlternativeParser(Generic[Input, Output], Parser[Input, Output]):
         self.parsers = parsers
 
     def consume(self, reader: Reader[Input]):
-        results = []
+        furthest = 0
+        best_result = None
         for parser in self.parsers:
             result = parser.consume(reader)
-            if isinstance(result, Continue):
-                results.append((result.remainder.position, result))
-            else:
-                results.append((result.farthest.position, result))
+            if not isinstance(result, Continue):
+                continue
 
-        sorted_results = [x[1] for x in sorted(results, key=lambda _: _[0], reverse=True)]
-        result = next((x for x in sorted_results if isinstance(x, Continue)), None)
-        if result is None:
-            return sorted_results[0]
-        return result
+            if result.remainder.finished:
+                this_result_distance = math.inf
+            else:
+                this_result_distance = result.farthest.position
+
+            if this_result_distance > furthest:
+                furthest = this_result_distance
+                best_result = result
+
+        if best_result is not None:
+            return best_result
+        else:
+            return result
 
     def __repr__(self):
         names = []
@@ -305,6 +322,81 @@ def repwksep(
     list is returned.
 
     Args:
+        :param parser: Parser or literal
+        :param separator: Parser or literal
+    """
+    if isinstance(parser, str):
+        parser = lit(parser)
+    if isinstance(separator, str):
+        separator = lit(separator)
+    return RepeatWithKeptSeparatorsParser(parser, separator)
+
+
+class SeparatedList(list):
+    separators: List[Any] = None
+
+
+class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Output]]):
+
+    def __init__(self, parser: Parser[Input, Output], separator: Parser[Input, Output]):
+        super().__init__()
+        self.parser = parser
+        self.separator = separator
+
+    def consume(self, reader: Reader[Input]):
+        output = []
+        separators = []
+        active_separator = None
+        remainder = reader
+        status = self.parser.consume(reader)
+        while isinstance(status, Continue):
+            active_separator = None
+            if remainder.position == status.remainder.position:
+                raise RuntimeError(remainder.recursion_error(str(self)))
+
+            remainder = status.remainder
+            output.append(status.value)
+
+            # check for separator
+            separator_status = self.separator.consume(remainder).merge(status)
+            if not isinstance(separator_status, Continue):
+                break
+
+            remainder = separator_status.remainder
+            active_separator = separator_status.value
+            separators.append(active_separator)
+
+            status = self.parser.consume(remainder).merge(status)
+
+        # note that this is tricksy, any separator that is truthy will trigger failure state
+        if active_separator:
+            return status
+
+        output_list = SeparatedList(output)
+        output_list.separators = separators
+
+        result_status = Continue(remainder, output_list).merge(status)
+        result_status.separators = separators
+        result_status.value.separators = separators
+
+        return result_status
+
+    def __repr__(self):
+        return self.name_or_nothing() + f"repsep({self.parser.name_or_repr()}, {self.separator.name_or_repr()})"
+
+
+
+def repsep2(
+    parser: Union[Parser, Sequence[Input]], separator: Union[Parser, Sequence[Input]]
+) -> RepeatedSeparatedParser2:
+    """Match a parser zero or more times separated by another parser.
+
+    This matches repeated sequences of ``parser`` separated by ``separator``. A
+    list is returned containing the value from each match of ``parser``. The
+    values from ``separator`` are discarded. If there are no matches, an empty
+    list is returned.
+
+    Args:
         parser: Parser or literal
         separator: Parser or literal
     """
@@ -312,4 +404,4 @@ def repwksep(
         parser = lit(parser)
     if isinstance(separator, str):
         separator = lit(separator)
-    return RepeatWithKeptSeparatorsParser(parser, separator)
+    return RepeatedSeparatedParser2(parser, separator)

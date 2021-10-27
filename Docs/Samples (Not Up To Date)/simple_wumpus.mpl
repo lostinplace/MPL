@@ -20,18 +20,18 @@ Wumpus: MACHINE
 
     Mindset: STATE
         Smell Prey: STATE
+        Near Prey: STATE
         Feel Secure: STATE
-        Near Prey: State
 
         Enter Smell Zone *~> Smell Prey
-        Exit Smell Zone *~> Smell Prey -> 0
+        Exit Smell Zone *~> Smell Prey -> VOID
 
         0 & Ok: Health ~> Feel Secure
-        Hurt: Health ~> Feel Secure |-> {Turns Wounded} -> 0
-                                    |-> {10} -> Feel Secure
+        Hurt: Health ~> Feel Secure |-% Turns Wounded -> VOID
+                                    |-% 10 -> Feel Secure
 
         Enter Strike Zone *~> Near Prey
-        Exit Strike Zone *~> Near Prey -> 0
+        Exit Strike Zone *~> Near Prey -> NOT Near Prey
 
     Smell Prey & Feel Secure ~> Wander -> Hunt
     Smell Prey & !Feel Secure ~> Wander -> Flee
@@ -40,8 +40,3 @@ Wumpus: MACHINE
     Near Prey & !Feel Secure ~> Attack -> Flee
 
     !Feel Secure & !Smell Prey & Hurt ~> Flee -> Recover
-
-
-
-
-

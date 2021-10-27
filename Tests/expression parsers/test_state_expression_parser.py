@@ -3,21 +3,17 @@ from Parser.Tokenizers.operator_tokenizers import StateOperator
 from Tests import collect_parsing_expectations, qle
 
 
-
-def test_simple_expression_parsers():
+def test_simple_state_expression_parsers():
     expectations = {
-        "test one:me & !c:STATE": StateExpression([
+        "END": StateExpression([
             StateOperation(
-                qle('test one:me'),
-                StateOperator('&')
+                qle('END'),
+                None
             ),
+        ]),
+        "VOID": StateExpression([
             StateOperation(
-                StateExpression([
-                    StateOperation(
-                        qle('c:STATE', 14),
-                        StateOperator('!')
-                    )
-                ]),
+                qle('VOID'),
                 None
             ),
         ]),
@@ -28,6 +24,31 @@ def test_simple_expression_parsers():
                     StateOperation(qle('b', 6), None)
                 ]),
                 StateOperator('!')
+            ),
+        ]),
+        "!c:STATE": StateExpression([
+            StateOperation(
+                qle('c:STATE', 1),
+                StateOperator('!')
+            ),
+        ]),
+        "test one:me & !c:STATE | d": StateExpression([
+            StateOperation(
+                qle('test one:me'),
+                StateOperator('&')
+            ),
+            StateOperation(
+                StateExpression([
+                    StateOperation(
+                        qle('c:STATE', 15),
+                        StateOperator('!')
+                    )
+                ]),
+                StateOperator('|')
+            ),
+            StateOperation(
+                qle('d', 25),
+                None
             ),
         ]),
         "d & e": StateExpression([
@@ -53,5 +74,6 @@ def test_simple_expression_parsers():
     }
 
     results = collect_parsing_expectations(expectations, StateExpressionParsers.expression)
-    for actual, expected, input in results:
-        assert actual == expected
+    for result in results:
+        result = result.as_strings()
+        assert result.actual == result.expected

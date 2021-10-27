@@ -1,9 +1,9 @@
 from typing import Dict, Any
 
-from parsita import Success, lit, Failure, opt, Parser
+from parsita import Success, lit, Failure, opt, Parser, TextParsers
 from parsita.state import Input, Output
 
-from lib.CustomParsers import excluding, at_least, check, best, track, repwksep
+from lib.CustomParsers import excluding, at_least, check, best, track, repwksep, debug
 
 
 def test_exclude_parser():
@@ -68,7 +68,7 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
 
 
 def test_repwksep_parser():
-    test_parser:Parser[Input,Input] = repwksep(lit('ok') | 'not ok', lit(',') | '+')
+    test_parser:Parser[Input, Input] = repwksep(lit('ok') | 'not ok', lit(',') | '+')
 
     expectations = {
         'ok,ok,not ok': [('ok', ','), ('ok', ','), 'not ok'],
@@ -77,4 +77,27 @@ def test_repwksep_parser():
     }
 
     assert_parsing_expectations(expectations, test_parser)
+
+blah = 'testing'
+
+
+def test_debug_callback():
+    result = False
+
+    def debug_cb(parser, reader):
+        nonlocal result
+        remainder = reader.source[reader.position :]
+        result = remainder == "45"
+        result &= isinstance(parser.parse(remainder), Failure)
+        result &= isinstance(parser.parse("345"), Success)
+
+    class TestParsers(TextParsers):
+        a = lit("123")
+        b = lit("345")
+        c = a & debug(b, callback=debug_cb)
+
+    TestParsers.c.parse("12345")
+    assert result
+    assert str(TestParsers.c) == "c = a & debug(b)"
+    assert blah == 'testing'
 

@@ -3,6 +3,7 @@ from typing import Dict, Any
 from parsita import Success, Failure
 
 from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, ReservedToken, StringToken, LabelToken
+from Tests import collect_parsing_expectations
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -25,34 +26,36 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
 
 def test_simple_value_tokenization():
     expectations = {
-        "a": LabelToken,
         "t`dsf`": Failure,
-        "Test Mee": LabelToken,
-        "Im a simple label": LabelToken,
+        "a": LabelToken('a'),
+        "Test Mee": LabelToken("Test Mee"),
+        "Im a simple label": LabelToken("Im a simple label"),
         "Im a broken 12 label": Failure,
         "a + b": Failure,
         "-10.556ds": Failure,
-        "21313.2121": NumberToken,
-        "0.2121": NumberToken,
-        "-10": NumberToken,
-        "-10.556": NumberToken,
-        "12e-5": NumberToken,
-        "123": NumberToken,
-        "MACHINE": ReservedToken,
-        "STATE": ReservedToken,
-        "TRIGGER": ReservedToken,
-        "INT": ReservedToken,
-        "DOUBLE": ReservedToken,
-        "STRING": ReservedToken,
-        "SET": ReservedToken,
-        "DICT": ReservedToken,
-        "BOOL": ReservedToken,
-        "NO-CACHE": ReservedToken,
-        "MACHINE": ReservedToken,
-        "FUNC": ReservedToken,
-        "`Testing`": (StringToken, "Testing"),
-        "`ldksjj dljsj fjslkdj`": (StringToken, "ldksjj dljsj fjslkdj")
-
+        "21313.2121": NumberToken("21313.2121"),
+        "0.2121": NumberToken("0.2121"),
+        "-10": NumberToken("-10"),
+        "-10.556": NumberToken("-10.556"),
+        "12e-5": NumberToken("12e-5"),
+        "123": NumberToken("123"),
+        "MACHINE": ReservedToken("MACHINE"),
+        "STATE": ReservedToken("STATE"),
+        "TRIGGER": ReservedToken("TRIGGER"),
+        "INT": ReservedToken("INT"),
+        "DOUBLE": ReservedToken("DOUBLE"),
+        "STRING": ReservedToken("STRING"),
+        "SET": ReservedToken("SET"),
+        "DICT": ReservedToken("DICT"),
+        "BOOL": ReservedToken("BOOL"),
+        "NO-CACHE": ReservedToken("NO-CACHE"),
+        "MACHINE": ReservedToken("MACHINE"),
+        "FUNC": ReservedToken("FUNC"),
+        "`Testing`": StringToken("Testing"),
+        "`ldksjj dljsj fjslkdj`": StringToken("ldksjj dljsj fjslkdj"),
     }
 
-    results = assert_parsing_expectations(expectations, SimpleValueTokenizers.token)
+    results = collect_parsing_expectations(expectations, SimpleValueTokenizers.token)
+    for result in results:
+        result = result.as_strings()
+        assert result.actual == result.expected

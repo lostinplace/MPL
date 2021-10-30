@@ -3,7 +3,7 @@ from typing import Dict, Any
 from parsita import Success, lit, Failure, opt, Parser, TextParsers
 from parsita.state import Input, Output
 
-from lib.CustomParsers import excluding, at_least, check, best, track, repwksep, debug
+from lib.CustomParsers import excluding, at_least, check, best, track, repwksep, debug, ParseResult
 
 
 def test_exclude_parser():
@@ -50,7 +50,9 @@ def test_track_parser():
 
     result = parser.parse(value)
 
-    assert result == Success([5, '678'])
+    assert result == Success(
+        ParseResult(value='678', start=5, ParserName=None)
+    )
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):

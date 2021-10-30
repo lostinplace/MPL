@@ -1,18 +1,18 @@
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union, List, Optional
 
-from parsita import TextParsers, fwd
+from parsita import TextParsers, fwd, longest
 
 from Parser.ExpressionParsers.label_expression_parser import LabelExpression, LabelExpressionParsers as lep
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as aep
-from Parser.Tokenizers.operator_tokenizers import StateOperator, LogicalOperatorParsers as lop
-from lib.CustomParsers import repsep2, SeparatedList
+from Parser.Tokenizers.operator_tokenizers import StateOperator, LogicalOperatorParsers as lop, LogicalOperator
+from lib.CustomParsers import repsep2, SeparatedList, debug
 
 
 @dataclass(frozen=True, order=True)
 class LogicalOperation:
     operand: Union[LabelExpression, 'LogicalExpression']
-    operator: StateOperator
+    operator: Optional[LogicalOperator]
 
 
 @dataclass(frozen=True, order=True)
@@ -37,16 +37,28 @@ def interpret_simple_expression(parser_results: SeparatedList):
     return result
 
 
+def db_cb(parser, reader):
+    pass
+
+
 class LogicalExpressionParsers(TextParsers):
-    simple_expression = fwd()
-    parenthesized_simple_expression = '(' >> simple_expression << ')'
+    simple_logical_expression = fwd()
+    parenthesized_simple_expression = '(' >> simple_logical_expression << ')'
 
     negated_expression = fwd()
-    expression_operand = parenthesized_simple_expression | negated_expression | lep.expression | aep.expression
-    __tmp_negated_expression = lop.logical_not & expression_operand > interpret_negated_expression
-    negated_expression.define(__tmp_negated_expression)
+    logical_expression_operand = longest(
+        debug(parenthesized_simple_expression, callback=db_cb), \
+        negated_expression, \
+        lep.expression, \
+        debug(aep.expression, callback=db_cb)
+    )
 
-    __tmp_se = repsep2(expression_operand, lop.operator) > interpret_simple_expression
+    negated_expression.define(
+        lop.logical_negation & logical_expression_operand > interpret_negated_expression
+    )
 
-    simple_expression.define(__tmp_se)
-    expression = negated_expression | simple_expression
+    simple_logical_expression.define(
+        debug(repsep2(logical_expression_operand, lop.operator, min=1), callback=db_cb) > interpret_simple_expression
+    )
+
+    expression = negated_expression | simple_logical_expression

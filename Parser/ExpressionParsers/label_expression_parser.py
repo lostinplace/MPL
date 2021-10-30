@@ -32,9 +32,9 @@ class LabelExpression:
     parent: 'LabelExpression'
 
 
-def interpret_label_expression(depth, parser_result):
+def interpret_label_expression(parser_result):
     """TODO: Reserved Tokens don't work right here"""
-    token, parent = parser_result
+    (token, parent) = parser_result.value
 
     tmp = SimpleValueTokenizers.reserved_token.parse(token.content)
     if isinstance(tmp, Success):
@@ -42,12 +42,12 @@ def interpret_label_expression(depth, parser_result):
 
     parent = parent and parent[0] or None
     name = token.content.strip()
-    result = LabelExpression(name, depth, token, parent)
+    result = LabelExpression(name, parser_result.start, token, parent)
     return result
 
 
 class LabelExpressionParsers(TextParsers):
     """TODO: Reserved Tokens don't work right here"""
     expression = fwd()
-    _tmp = track((SimpleValueTokenizers.label_token) & opt(':' >> expression)) > splat(interpret_label_expression)
+    _tmp = track((SimpleValueTokenizers.label_token) & opt(':' >> expression)) > interpret_label_expression
     expression.define(_tmp)

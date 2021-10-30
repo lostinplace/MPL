@@ -1,9 +1,10 @@
+import dataclasses
 import math
 from typing import Generic, Sequence, Union, Callable, Optional, List, Any
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.parsers import AlternativeParser
-from parsita.state import Input, Output, Continue, Backtrack
+from parsita.state import Input, Output, Continue, Backtrack, Failure
 
 
 class ExcludingParser(Generic[Input, Output], Parser[Input, Input]):
@@ -240,29 +241,40 @@ def best(*parsers: Parser[Input, Output]) -> BestAlternativeParser:
     return BestAlternativeParser(*processed_parsers)
 
 
+# TODO:  sort out how tracking should look
+
+@dataclasses.dataclass(frozen=True, order=True)
+class ParseResult:
+    value: Any
+    start: int
+    ParserName: str
+
 class TrackParser(Generic[Input, Output], Parser[Input, Input]):
     def __init__(self, parser: Parser[Input, Output]):
         super().__init__()
         self.parser = parser
         parserdef = repr(parser)
-        self.name_cb = lambda: f"tracking the depth of {parserdef} before moving on"
+        self.name_cb = lambda: f"tracking {parserdef}"
         self.length = len(repr(parser))
 
     def consume(self, reader: Reader[Input]):
-        result = self.parser.consume(reader)
-        if isinstance(result, Continue):
-            return Continue(result.remainder, [reader.position, result.value])
-        return result
+        status = self.parser.consume(reader)
+
+        if isinstance(status, Continue):
+            result = ParseResult(
+                status.value,
+                reader.position,
+                self.parser.name
+            )
+            return Continue(status.remainder, result)
+        return status
 
     def __repr__(self):
         return self.name_or_nothing() + 'track({})'.format(repr(self.parser))
 
 
 def track(parser: Parser[Input, Output]) -> ExcludingParser:
-    """Tracks the current depth of the start of the successful parser
-
-    This will match text against the provided parser, and accept if that parser can move forward, else it will backtrack.
-    the result it returns will include an integer that specifies the depth that the match began
+    """Tracks metadata about the result of the provided parser
 
     Args:
         :param parser: a parser that parses terms that you want to make sure are present
@@ -337,11 +349,18 @@ class SeparatedList(list):
 
 
 class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Output]]):
+    def __init__(self,
+                 parser: Parser[Input, Output],
+                 separator: Parser[Input, Output],
+                 min: Optional[int]=None,
+                 max: Optional[int] = None,
 
-    def __init__(self, parser: Parser[Input, Output], separator: Parser[Input, Output]):
+                 ):
         super().__init__()
         self.parser = parser
         self.separator = separator
+        self.repetition_minimum = min
+        self.repetition_maximum = max
 
     def consume(self, reader: Reader[Input]):
         output = []
@@ -350,6 +369,10 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         remainder = reader
         status = self.parser.consume(reader)
         while isinstance(status, Continue):
+            if self.repetition_maximum and self.repetition_maximum < len(output):
+                message = f"repetition count maximum {self.repetition_maximum} exceeded for {self.name_or_nothing()}"
+                return Backtrack(reader, lambda: message)
+
             active_separator = None
             if remainder.position == status.remainder.position:
                 raise RuntimeError(remainder.recursion_error(str(self)))
@@ -375,6 +398,10 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         output_list = SeparatedList(output)
         output_list.separators = separators
 
+        if self.repetition_minimum and self.repetition_minimum > len(output):
+            message = f"repetition count minimum {self.repetition_minimum} not met for {self.name_or_nothing()}"
+            return Backtrack(reader, lambda: message)
+
         result_status = Continue(remainder, output_list).merge(status)
         result_status.separators = separators
         result_status.value.separators = separators
@@ -382,12 +409,14 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         return result_status
 
     def __repr__(self):
-        return self.name_or_nothing() + f"repsep({self.parser.name_or_repr()}, {self.separator.name_or_repr()})"
+        return self.name_or_nothing() + f"repsep2({self.parser.name_or_repr()}, {self.separator.name_or_repr()})"
 
 
 
 def repsep2(
-    parser: Union[Parser, Sequence[Input]], separator: Union[Parser, Sequence[Input]]
+    parser: Union[Parser, Sequence[Input]], separator: Union[Parser, Sequence[Input]],
+        min:Optional[int]=None,
+        max:Optional[int]=None,
 ) -> RepeatedSeparatedParser2:
     """Match a parser zero or more times separated by another parser.
 
@@ -397,11 +426,13 @@ def repsep2(
     list is returned.
 
     Args:
-        parser: Parser or literal
-        separator: Parser or literal
+        :param parser: Parser or literal
+        :param separator: Parser or literal
+        :param min: Minimum number of repetitions before the parser succeeds
+        :param max: Maximum number of repetitions before the parser fails
     """
     if isinstance(parser, str):
         parser = lit(parser)
     if isinstance(separator, str):
         separator = lit(separator)
-    return RepeatedSeparatedParser2(parser, separator)
+    return RepeatedSeparatedParser2(parser, separator, min, max)

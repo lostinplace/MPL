@@ -28,16 +28,6 @@ def interpret_negated_expression(parser_result):
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
-    """
-    This can receive a list of:
-        (label expression | simple expression | negated simple expression, operator)
-        or
-        label expression | simple expression | negated simple expression
-
-    :param parser_results:
-    :return:
-    """
-
     operands = parser_results
     operators = parser_results.separators + [None]
 
@@ -57,7 +47,8 @@ class StateExpressionParsers(TextParsers):
 
     __tmp_se = repsep2(
         simple_expression_operand,
-        (sop.and_state | sop.or_state)
+        (sop.and_state | sop.or_state),
+        min=1
     ) > interpret_simple_expression
 
     simple_expression.define(__tmp_se)

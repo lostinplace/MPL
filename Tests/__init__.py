@@ -106,7 +106,6 @@ def qdae(*args):
 
         if isinstance(operand, (int, float)):
             operand = NumberToken(str(operand))
-
         tmp = ArithmeticOperation(operand, operator)
         results.append(tmp)
     result = ArithmeticExpression(results)

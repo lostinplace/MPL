@@ -1,5 +1,6 @@
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers
-from Tests import assert_parsing_expectations, qdae
+from Tests import assert_parsing_expectations, qdae, collect_parsing_expectations, qle
+
 
 
 def test_simple_expression_parsers():
@@ -49,4 +50,22 @@ def test_simple_expression_parsers():
         "12.0/-13^14.15--16": qdae((12.0, '/'), (-13, '^'), (14.15, '-'), -16),
     }
 
-    assert_parsing_expectations(expectations, ArithmeticExpressionParsers.expression)
+    for result in collect_parsing_expectations(expectations, ArithmeticExpressionParsers.expression):
+        assert result.actual == result.expected
+
+
+def test_simple_expression_parsers():
+    expectations = {
+        "1+(test-3)*4": qdae(
+            (1, '+'),
+            (qdae(
+                (qle("test", 3), '-'),
+                3
+            ), '*'
+            ),
+            4
+        ),
+    }
+
+    for result in collect_parsing_expectations(expectations, ArithmeticExpressionParsers.expression):
+        assert result.actual == result.expected

@@ -9,10 +9,36 @@ from Tests import collect_parsing_expectations, qle, qdae
 
 
 class LogicalExpresssionTests(unittest.TestCase):
-
     def test_logical_expression_parsers(self):
+        # TODO:  need more tests
         self.maxDiff = None
         expectations = {
+            "a && (brett + 7 != 4) || d": LogicalExpression([
+                LogicalOperation(
+                    qle('a'),
+                    LogicalOperator('&&')
+                ),
+                LogicalOperation(
+                    LogicalExpression([
+                        LogicalOperation(
+                            qdae(
+                                (qle('brett', 6), '+'),
+                                7
+                            ),
+                            LogicalOperator('!=')
+                        ),
+                        LogicalOperation(
+                            qdae(4), None
+                        ),
+
+                    ]),
+                    LogicalOperator('||')
+                ),
+                LogicalOperation(
+                    qle('d', 25),
+                    None
+                ),
+            ]),
             "A == 1": LogicalExpression([
                 LogicalOperation(
                     qle('A'),
@@ -22,7 +48,25 @@ class LogicalExpresssionTests(unittest.TestCase):
                     qdae(1),
                     None
                 ),
-            ])
+            ]),
+            "A && B != C || D": LogicalExpression([
+                LogicalOperation(
+                    qle('A'),
+                    LogicalOperator('&&')
+                ),
+                LogicalOperation(
+                    qle('B', 5),
+                    LogicalOperator('!=')
+                ),
+                LogicalOperation(
+                    qle('C', 10),
+                    LogicalOperator('||')
+                ),
+                LogicalOperation(
+                    qle('D', 15),
+                    None
+                ),
+            ]),
         }
 
         results = collect_parsing_expectations(expectations, LogicalExpressionParsers.expression)

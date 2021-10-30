@@ -3,9 +3,9 @@ from typing import Union, List
 
 from parsita import TextParsers, fwd, longest
 
-from Parser.ExpressionParsers.label_expression_parser import LabelExpression
+from Parser.ExpressionParsers.label_expression_parser import LabelExpression, LabelExpressionParsers as lexp
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator, ArithmeticOperatorParsers as aop
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers as svp
+from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers as svt
 from lib.CustomParsers import best, repwksep, repsep2
 
 
@@ -31,11 +31,11 @@ def interpret_simple_expression(parser_results):
 
 
 class ArithmeticExpressionParsers(TextParsers):
-    simple_expression = fwd()
-    parenthesized_simple_expression = '(' >> simple_expression << ')'
+    simple_arithmetic_expression = fwd()
+    parenthesized_simple_expression = '(' >> simple_arithmetic_expression << ')'
 
-    simple_expression_operand = svp.number_token | parenthesized_simple_expression
-    __tmp_se = repsep2(simple_expression_operand, aop.operator) > interpret_simple_expression
-    simple_expression.define(__tmp_se)
+    arithmetic_expression_operand = parenthesized_simple_expression | lexp.expression | svt.number_token
+    __tmp_se = repsep2(arithmetic_expression_operand, aop.operator, min=1) > interpret_simple_expression
+    simple_arithmetic_expression.define(__tmp_se)
 
-    expression = longest(parenthesized_simple_expression, simple_expression )
+    expression = longest(parenthesized_simple_expression, simple_arithmetic_expression)

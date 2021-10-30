@@ -27,13 +27,13 @@ S = {
 s_inverted = dict(map(reversed, S.items()))
 
 
-def interpret_operator(depth, params):
-    lhs, middle, rhs = params
+def interpret_operator(result):
+    lhs, middle, rhs = result.value
     lhs = lhs and lhs[0] or ''
     lhs_out = s_inverted[lhs]
     middle_out = s_inverted[middle]
     rhs_out = s_inverted[rhs]
-    result = MPLOperator(lhs_out, middle_out, rhs_out, depth)
+    result = MPLOperator(lhs_out, middle_out, rhs_out, result.start)
     return result
 
 
@@ -42,7 +42,7 @@ class MPLOperatorParsers(TextParsers, whitespace=None):
     lhs = lit(S['EVENT']) | S['FORK']
     middle = lit(S['CONSUME']) | S['OBSERVE']
     rhs = lit(S['STATE']) | S['EVENT'] | S['ACTION']
-    operator = ignored_whitespace >> track(opt(lhs) & middle & rhs) << ignored_whitespace > splat(interpret_operator)
+    operator = ignored_whitespace >> track(opt(lhs) & middle & rhs) << ignored_whitespace > interpret_operator
 
 
 @dataclass(frozen=True, order=True)
@@ -65,10 +65,10 @@ class LogicalOperator:
 
 
 class LogicalOperatorParsers(TextParsers):
+    logical_negation = lit('!') > LogicalOperator
+
     logical_and = lit('&&') > LogicalOperator
     logical_or = lit('||') > LogicalOperator
-    logical_not = lit('!') > LogicalOperator
-
     logical_equals = lit('==') > LogicalOperator
     logical_not_equals = lit('!=') > LogicalOperator
     logical_gt = lit('>') > LogicalOperator
@@ -76,7 +76,7 @@ class LogicalOperatorParsers(TextParsers):
     logical_lt = lit('<') > LogicalOperator
     logical_lte = lit('<=') > LogicalOperator
 
-    operator = logical_and | logical_or | logical_not | logical_equals | logical_not_equals | logical_gt | \
+    operator = logical_and | logical_or | logical_equals | logical_not_equals | logical_gt | \
                logical_gte | logical_lt | logical_lte
 
 

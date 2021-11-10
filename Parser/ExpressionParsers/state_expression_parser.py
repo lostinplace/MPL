@@ -3,37 +3,34 @@ from typing import Union, List
 
 from parsita import TextParsers, fwd, opt, lit
 
-from Parser.ExpressionParsers.label_expression_parser import LabelExpression, LabelExpressionParsers as lep
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lep
 from Parser.Tokenizers.operator_tokenizers import StateOperator, StateOperatorParsers as sop
-from lib.CustomParsers import best, repwksep, repsep2, SeparatedList
+from lib.custom_parsers import best, repwksep, repsep2, SeparatedList
 
 
 @dataclass(frozen=True, order=True)
 class StateOperation:
-    operand: Union[LabelExpression, 'StateExpression']
+    operand: Union[ReferenceExpression, 'StateExpression']
     operator: StateOperator
 
 
 @dataclass(frozen=True, order=True)
 class StateExpression:
-    operations: List[StateOperation]
+    operands: List[Union[ReferenceExpression, 'StateExpression']]
+    operators: List[StateOperator]
 
 
 def interpret_negated_expression(parser_result):
     operand = parser_result[1]
     operator = parser_result[0]
-    operation = StateOperation(operand, operator)
-    result = StateExpression([operation])
+    result = StateExpression([operand], [operator])
     return result
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
     operands = parser_results
-    operators = parser_results.separators + [None]
-
-    operations = [StateOperation(operand, operator) for operand, operator in  zip(operands, operators)]
-
-    result = StateExpression(operations)
+    operators = parser_results.separators
+    result = StateExpression(operands, operators)
     return result
 
 

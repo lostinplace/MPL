@@ -1,9 +1,10 @@
 from typing import Dict, Any
 
-from parsita import Success, lit, Failure, opt, Parser, TextParsers
-from parsita.state import Input, Output
+from parsita import Success, lit, Failure, opt, Parser, TextParsers, reg, rep, repsep
+from parsita.state import Input, Output, StringReader, Continue
 
-from lib.CustomParsers import excluding, at_least, check, best, track, repwksep, debug, ParseResult
+from Tests import collect_parsing_expectations
+from lib.custom_parsers import excluding, at_least, check, best, track, repwksep, debug, ParseResult, back
 
 
 def test_exclude_parser():
@@ -50,9 +51,9 @@ def test_track_parser():
 
     result = parser.parse(value)
 
-    assert result == Success(
-        ParseResult(value='678', start=5, ParserName=None)
-    )
+    assert isinstance(result, Success)
+    assert result.value.value == '678'
+    assert result.value.start == 5
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -102,4 +103,35 @@ def test_debug_callback():
     assert result
     assert str(TestParsers.c) == "c = a & debug(b)"
     assert blah == 'testing'
+
+
+def test_lookback():
+
+
+    expectations = {
+        "v/test/bp21": [
+            "v",
+            "test",
+            {'test': 'bp21'},
+        ],
+        "v/test/bp21/": [
+            "v",
+            "test",
+            {'test': 'bp21'},
+            ""
+        ],
+        "cp//123123": [
+            "cp",
+            "",
+            '123123',
+        ],
+    }
+
+    identifier = reg('[a-zA-Z0-9]*')
+    process_test_id = lambda _: {'test': _}
+    test_id = back('test/') >> identifier > process_test_id
+    test_parser = repsep(test_id | identifier, '/')
+
+    for result in collect_parsing_expectations(expectations, test_parser):
+        assert result.actual == result.expected
 

@@ -3,30 +3,29 @@ from typing import Union, List
 
 from parsita import TextParsers, fwd, longest
 
-from Parser.ExpressionParsers.label_expression_parser import LabelExpression, LabelExpressionParsers as lexp
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lexp
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator, ArithmeticOperatorParsers as aop
 from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers as svt
-from lib.CustomParsers import best, repwksep, repsep2
+from lib.custom_parsers import best, repwksep, repsep2
 
 
 @dataclass(frozen=True, order=True)
 class ArithmeticOperation:
-    operand: Union[NumberToken, LabelExpression, 'ArithmeticExpression']
+    operand: Union[NumberToken, ReferenceExpression, 'ArithmeticExpression']
     operator: ArithmeticOperator
 
 
 @dataclass(frozen=True, order=True)
 class ArithmeticExpression:
-    operations: List[ArithmeticOperation]
+    operands: List[Union[NumberToken, ReferenceExpression, 'ArithmeticExpression']]
+    operators: List[ArithmeticOperator]
 
 
 def interpret_simple_expression(parser_results):
     operands = parser_results
-    operators = parser_results.separators + [None]
+    operators = parser_results.separators
 
-    operations = [ArithmeticOperation(operand, operator) for operand, operator in  zip(operands, operators)]
-
-    result = ArithmeticExpression(operations)
+    result = ArithmeticExpression(operands, operators)
     return result
 
 

@@ -4,7 +4,7 @@ from typing import Generic, Sequence, Union, Callable, Optional, List, Any
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.parsers import AlternativeParser
-from parsita.state import Input, Output, Continue, Backtrack, Failure
+from parsita.state import Input, Output, Continue, Backtrack, Failure, Status, SequenceReader
 
 
 class ExcludingParser(Generic[Input, Output], Parser[Input, Input]):
@@ -102,7 +102,6 @@ class CheckParser(Generic[Input, Output], Parser[Input, Input]):
         self.parser = parser
         parserdef = repr(parser)
         self.name_cb = lambda: f"to see {parserdef} before moving on"
-        self.length = len(repr(parser))
 
     def consume(self, reader: Reader[Input]):
         result = self.parser.consume(reader)
@@ -125,6 +124,50 @@ def check(parser: Parser[Input, Output]) -> ExcludingParser:
     if isinstance(parser, str):
         parser = lit(parser)
     return CheckParser(parser)
+
+
+class LookbackParser(Generic[Input, Output], Parser[Input, Input]):
+    def __init__(self, parser: Parser[Input, Output], limit: int = None):
+        super().__init__()
+        self.parser = parser
+        parserdef = repr(parser)
+        self.name_cb = lambda: f"look backward for {parserdef} in the stream before proceeding"
+        self.limit = limit
+
+    def consume(self, reader: Reader[Input]):
+
+        source = reader.source
+        end = reader.position
+        start = end
+        result = None
+
+        while start > 0 and (self.limit is None or self.limit > end - start):
+            start -= 1
+            content = source[start:end]
+            tmp_reader = StringReader(content)
+            result = self.parser.consume(tmp_reader)
+            if isinstance(result, Continue):
+                if result.remainder.finished:
+                    return Continue(reader, result.value)
+                break
+
+        return Backtrack(reader, self.name_cb)
+
+    def __repr__(self):
+        return self.name_or_nothing() + 'back({})'.format(repr(self.parser))
+
+
+def back(parser: Parser[Input, Output], limit: int = None) -> ExcludingParser:
+    """Evaluates to see if you're on the right track without consuming input
+
+    This will match text against the provided parser, and continue if that parser can move forward, else it will backtrack
+
+    Args:
+        :param parser: a parser that parses terms that you want to make sure are present
+    """
+    if isinstance(parser, str):
+        parser = lit(parser)
+    return LookbackParser(parser, limit)
 
 
 class DebugParser(Generic[Input, Output], Parser[Input, Output]):
@@ -241,13 +284,13 @@ def best(*parsers: Parser[Input, Output]) -> BestAlternativeParser:
     return BestAlternativeParser(*processed_parsers)
 
 
-# TODO:  sort out how tracking should look
-
 @dataclasses.dataclass(frozen=True, order=True)
 class ParseResult:
     value: Any
     start: int
-    ParserName: str
+    parser_name: str
+    status: Status[Input, Output]
+
 
 class TrackParser(Generic[Input, Output], Parser[Input, Input]):
     def __init__(self, parser: Parser[Input, Output]):
@@ -264,7 +307,8 @@ class TrackParser(Generic[Input, Output], Parser[Input, Input]):
             result = ParseResult(
                 status.value,
                 reader.position,
-                self.parser.name
+                self.parser.name,
+                status
             )
             return Continue(status.remainder, result)
         return status
@@ -368,6 +412,7 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         active_separator = None
         remainder = reader
         status = self.parser.consume(reader)
+        last_success = None
         while isinstance(status, Continue):
             if self.repetition_maximum and self.repetition_maximum < len(output):
                 message = f"repetition count maximum {self.repetition_maximum} exceeded for {self.name_or_nothing()}"
@@ -389,11 +434,13 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
             active_separator = separator_status.value
             separators.append(active_separator)
 
+            last_success = status
             status = self.parser.consume(remainder).merge(status)
 
         # note that this is tricksy, any separator that is truthy will trigger failure state
         if active_separator:
-            return status
+            status = last_success
+            separators = separators[:-1]
 
         output_list = SeparatedList(output)
         output_list.separators = separators
@@ -402,7 +449,7 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
             message = f"repetition count minimum {self.repetition_minimum} not met for {self.name_or_nothing()}"
             return Backtrack(reader, lambda: message)
 
-        result_status = Continue(remainder, output_list).merge(status)
+        result_status = Continue(status.remainder, output_list).merge(status)
         result_status.separators = separators
         result_status.value.separators = separators
 
@@ -410,7 +457,6 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
 
     def __repr__(self):
         return self.name_or_nothing() + f"repsep2({self.parser.name_or_repr()}, {self.separator.name_or_repr()})"
-
 
 
 def repsep2(

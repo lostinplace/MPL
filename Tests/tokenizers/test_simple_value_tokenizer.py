@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from parsita import Success, Failure
 
-from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, ReservedToken, StringToken, LabelToken
+from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, ReservedToken, StringToken, ReferenceToken
 from Tests import collect_parsing_expectations
 
 
@@ -27,10 +27,10 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
 def test_simple_value_tokenization():
     expectations = {
         "t`dsf`": Failure,
-        "a": LabelToken('a'),
-        "Test Mee": LabelToken("Test Mee"),
-        "Im a simple label": LabelToken("Im a simple label"),
-        "Im a broken 12 label": Failure,
+        "a": ReferenceToken('a'),
+        "Test Mee": ReferenceToken("Test Mee"),
+        "Im a simple reference": ReferenceToken("Im a simple reference"),
+        "Im a broken 12 reference": Failure,
         "a + b": Failure,
         "-10.556ds": Failure,
         "21313.2121": NumberToken("21313.2121"),

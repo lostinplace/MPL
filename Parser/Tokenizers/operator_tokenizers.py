@@ -1,27 +1,29 @@
 from dataclasses import dataclass
+from typing import Optional
 
-from parsita import TextParsers, lit, opt, rep
+from parsita import TextParsers, lit, opt, rep, success
 from parsita.util import splat
 
-from lib.CustomParsers import track
+from lib.custom_parsers import track
 
 
 @dataclass(frozen=True, order=True)
 class MPLOperator:
-    LHType: str
+    LHType: Optional[str]
     behavior: str
     RHType: str
     depth: int
 
 
 S = {
-    'ANY': '',
+    'ANY': None,
     'EVENT': '*',
     'STATE': '>',
     'ACTION': '@',
     'FORK': '|',
     "CONSUME": '-',
     "OBSERVE": '~',
+    "QUERY": '?',
 }
 
 s_inverted = dict(map(reversed, S.items()))
@@ -29,7 +31,7 @@ s_inverted = dict(map(reversed, S.items()))
 
 def interpret_operator(result):
     lhs, middle, rhs = result.value
-    lhs = lhs and lhs[0] or ''
+    lhs = lhs and lhs[0] or None
     lhs_out = s_inverted[lhs]
     middle_out = s_inverted[middle]
     rhs_out = s_inverted[rhs]
@@ -39,10 +41,28 @@ def interpret_operator(result):
 
 class MPLOperatorParsers(TextParsers, whitespace=None):
     ignored_whitespace = rep(lit(" ") | '\t')
+
     lhs = lit(S['EVENT']) | S['FORK']
     middle = lit(S['CONSUME']) | S['OBSERVE']
-    rhs = lit(S['STATE']) | S['EVENT'] | S['ACTION']
-    operator = ignored_whitespace >> track(opt(lhs) & middle & rhs) << ignored_whitespace > interpret_operator
+    rhs = lit(S['STATE']) | S['EVENT'] | S['ACTION'] | S['QUERY']
+
+    left_trigger_operator = '*' & middle & rhs
+    right_trigger_operator = opt(lhs) & middle & '*'
+    trigger_operator = left_trigger_operator | right_trigger_operator
+
+    action_operator = opt(lhs) & middle & '@'
+
+    left_state_operator = success(None) & middle & '>'
+    right_state_operator = opt(lhs) & middle & '>'
+    state_operator = left_state_operator | right_state_operator
+
+    query_operator = opt(lhs) & middle & '?'
+
+    fork_operator = '|' & middle & rhs
+
+    any_operator = trigger_operator | action_operator | state_operator | query_operator | fork_operator
+
+    operator = ignored_whitespace >> track(any_operator) << ignored_whitespace > interpret_operator
 
 
 @dataclass(frozen=True, order=True)

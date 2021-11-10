@@ -1,9 +1,8 @@
-from typing import Dict
+from typing import Dict, Any
 
 from parsita import Success, Failure, lit
 
 from Parser.Tokenizers.operator_tokenizers import MPLOperatorParsers, MPLOperator, StateOperator, StateOperatorParsers
-from Parser.old.expression_parser import Any
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -28,6 +27,7 @@ def test_mploperator_parsers():
         '@~>': Failure,
         '|->': MPLOperator('FORK', 'CONSUME', 'STATE', 0),
         '|~@': MPLOperator('FORK', 'OBSERVE', 'ACTION', 0),
+        '   |~@': MPLOperator('FORK', 'OBSERVE', 'ACTION', 3),
     }
 
     results = assert_parsing_expectations(expectations, MPLOperatorParsers.operator)

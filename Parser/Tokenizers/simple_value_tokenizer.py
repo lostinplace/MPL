@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from parsita import TextParsers, reg, success, longest
 
-from lib.CustomParsers import best
+from lib.custom_parsers import best
 
 """
 # Simple Value Tokenizer
@@ -44,7 +44,7 @@ class StringToken:
 
 
 @dataclass(frozen=True, order=True)
-class LabelToken:
+class ReferenceToken:
     content: str
 
 
@@ -64,6 +64,6 @@ class SimpleValueTokenizers(TextParsers):
 
     string_token = '`' >> reg(r"""[^`]+""") << '`' > to(StringToken)
 
-    label_token = reg(r"""[A-Za-z\s]+""") > to(LabelToken)
+    reference_token = reg(r"""[A-Za-z\s]+""") > to(ReferenceToken)
 
-    token = longest(number_token, reserved_token, string_token, label_token)
+    token = longest(number_token, reserved_token, string_token, reference_token)

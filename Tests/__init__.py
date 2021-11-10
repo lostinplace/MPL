@@ -1,12 +1,12 @@
 from dataclasses import replace, dataclass
-from typing import Any, Dict, Generator, Iterator
+from typing import Any, Dict, Iterator
 
 from parsita import Failure, Success
 
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticOperation, ArithmeticExpression
-from Parser.ExpressionParsers.label_expression_parser import LabelExpression, LabelExpressionParsers
+from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken, LabelToken, SimpleValueTokenizers
+from Parser.Tokenizers.simple_value_tokenizer import NumberToken
 
 
 @dataclass(frozen=True, order=True)
@@ -43,27 +43,6 @@ def nest_string(source: Any):
     return result
 
 
-def assert_parsing_expectations(expectations: Dict[str, Any], parser):
-    results = []
-    for (v, expected_outcome) in expectations.items():
-        result = parser.parse(v)
-
-        if expected_outcome is Failure:
-            assert type(result) is Failure
-            continue
-        if type(result) == Failure:
-            breakpoint()
-            pass
-        assert type(result) == Success
-
-        result_str = nest_string(result)
-        expected_str = nest_string(Success(expected_outcome))
-
-        assert result_str == expected_str
-        results.append((v, expected_outcome, result))
-    return results
-
-
 def collect_parsing_expectations(expectations: Dict[str, Any], parser) -> Iterator[ParseResult]:
     """
 
@@ -83,7 +62,7 @@ def collect_parsing_expectations(expectations: Dict[str, Any], parser) -> Iterat
         yield result
 
 
-def qdae(*args):
+def qdae(value):
     """
     quick define arithmetic expression
 
@@ -91,36 +70,15 @@ def qdae(*args):
     :param args:
     :return:
     """
-    results = []
-    for arg in args:
-        operand = arg
-        operator = None
-
-        if isinstance(arg, tuple):
-            operand = arg[0]
-            operator = ArithmeticOperator(arg[1])
-
-            if isinstance(operand, tuple):
-                operand = qdae(*arg)
-                operator = None
-
-        if isinstance(operand, (int, float)):
-            operand = NumberToken(str(operand))
-        tmp = ArithmeticOperation(operand, operator)
-        results.append(tmp)
-    result = ArithmeticExpression(results)
-    return result
+    result = ArithmeticExpressionParsers.expression.parse(value)
+    return result.value
 
 
-def qle(input, depth:int = None):
-    result = LabelExpressionParsers.expression.parse(input).value
-    # TODO:  this only goes to depth of 1
-    if depth is not None:
-        result = replace(result, depth=depth)
-        result_parent = result.parent
-        if result_parent is not None:
-            parent_depth = result.parent.depth
-            result_parent = replace(result.parent, depth=parent_depth + depth)
-            result = replace(result, parent=result_parent)
-
-    return result
+def qre(value):
+    """
+    quickly build a reference expression
+    :param value:
+    :return:
+    """
+    result: Success = ReferenceExpressionParsers.expression.parse(value)
+    return result.value

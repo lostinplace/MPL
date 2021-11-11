@@ -4,7 +4,7 @@ Wumpus: MACHINE
         Hurt
         Dead
 
-    0 ~> Health/Ok
+    $ ~> Health/Ok
 
     Hurt ~@ Turns Wounded: INT += 1
     Ok ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
@@ -21,7 +21,7 @@ Wumpus: MACHINE
 
     Activity/Recover ~> Hurt -> Ok
 
-    0 ~> Activity/Wander
+    $ ~> Activity/Wander
 
     Mindset: MACHINE
         Smell Prey: STATE
@@ -29,15 +29,15 @@ Wumpus: MACHINE
         Feel Secure: STATE
 
         Distance To Prey < Smell Range -> Smell Prey
-        Distance To Prey > Smell Range -> Smell Prey -> 0
+        Distance To Prey > Smell Range -> Smell Prey -> $
 
         0 & Ok: Health ~> Feel Secure
 
-        Hurt: Health ~> Feel Secure -% Turns Wounded -> 0
+        Hurt: Health ~> Feel Secure -% Turns Wounded -> $
         Hurt: Health ~> Feel Secure -% 10 -> Feel Secure
 
         Enter Strike Zone *~> Near Prey
-        Exit Strike Zone *~> Near Prey -> 0
+        Exit Strike Zone *~> Near Prey -> $
 
     Smell Prey & Feel Secure ~> Wander -> Hunt
     Smell Prey & !Feel Secure ~> Wander -> Flee

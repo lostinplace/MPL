@@ -11,7 +11,7 @@ REFERENCE_EXPRESSION = REFERENCE_TOKEN (: REFERENCE_EXPRESSION)?
 from dataclasses import dataclass
 from typing import Union, Optional, List
 
-from parsita import TextParsers, fwd, opt, Success, repsep, longest
+from parsita import TextParsers, opt, longest
 from parsita.util import splat
 
 from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers as svt, ReferenceToken, ReservedToken

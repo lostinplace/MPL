@@ -3,7 +3,8 @@ from typing import Union, List, Optional
 
 from parsita import TextParsers, fwd, longest
 
-from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers as aexp, AssignmentExpression
+from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers as asexp, AssignmentExpression
+from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as aexp, ArithmeticExpression
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers as lexp
 from Parser.ExpressionParsers.state_expression_parser import StateExpression, StateExpressionParsers as sexp
 from Parser.Tokenizers.operator_tokenizers import StateOperator, MPLOperator, LogicalOperatorParsers as lop, MPLOperatorParsers as mops\
@@ -12,16 +13,28 @@ from lib.custom_parsers import repsep2, SeparatedList, debug, check, back
 
 
 @dataclass(frozen=True, order=True)
+class RuleClause:
+    type: str
+    expression: Union[StateExpression, LogicalExpression, AssignmentExpression, ArithmeticExpression]
+
+
+@dataclass(frozen=True, order=True)
 class Rule:
-    operands: List[Union[StateExpression, LogicalExpression, AssignmentExpression]]
+    clauses: List[RuleClause]
     operators: List[MPLOperator]
+
+
+def to_clause(clause_type):
+    def result_func(parser_output):
+        return RuleClause(clause_type, parser_output)
+    return result_func
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
     operands = parser_results
     operators = parser_results.separators
 
-    result = LogicalExpression(operands, operators)
+    result = Rule(operands, operators)
     return result
 
 
@@ -30,32 +43,22 @@ def db_cb(parser, reader):
 
 
 class RuleExpressionParsers(TextParsers):
-    trigger_clause = (sexp.expression << check(mops.left_trigger_operator)) | \
-                     (back(mops.right_trigger_operator) >> sexp.expression)
 
-    query_clause = back(mops.query_operator) >> lexp.expression
+    trigger_operand = longest(sexp.expression | lexp.expression)
 
-    state_clause = sexp.expression << check(mops.right_state_operator) | \
-                   (back(mops.left_state_operator) >> sexp.expression)
+    trigger_clause = (back(mops.trigger_on_the_right_operator) >> trigger_operand) | \
+                     (trigger_operand << check(mops.trigger_on_the_left_operator)) > to_clause('trigger')
 
-    action_clause = back(mops.action_operator)
+    query_clause = back(mops.query_operator) >> lexp.expression > to_clause('query')
 
-    simple_rule_expression = fwd()
-    parenthesized_simple_expression = '(' >> simple_rule_expression << ')'
+    state_clause = (back(mops.state_on_the_right_operator) >> sexp.expression) | \
+                   sexp.expression << check(mops.state_on_the_left_operator) |\
+                   sexp.expression > to_clause('state')
 
-    trigger_clause = sexp.expression & check(mops.right_trigger_operator) | check(mops.left_trigger_operator) & sexp.expression
-    query_clause = check(mops.query_operator)
+    action_clause = back(mops.action_operator) >> asexp.expression > to_clause('action')
 
-    negated_expression = fwd()
-    logical_expression_operand = longest(
-        parenthesized_simple_expression, \
-        negated_expression, \
-        lexp.expression, \
-        aexp.expression
-    )
+    scenario_clause = back(mops.scenario_operator) >> aexp.expression > to_clause('scenario')
 
-    simple_rule_expression.define(
-        repsep2(logical_expression_operand, lop.operator, min=1) > interpret_simple_expression
-    )
+    any_clause = longest(trigger_clause, query_clause, action_clause, scenario_clause, state_clause)
 
-    expression = simple_rule_expression
+    expression = repsep2(any_clause, mops.operator, min=2) > interpret_simple_expression

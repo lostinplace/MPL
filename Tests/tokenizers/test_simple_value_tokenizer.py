@@ -29,6 +29,7 @@ def test_simple_value_tokenization():
         "t`dsf`": Failure,
         "a": ReferenceToken('a'),
         "Test Mee": ReferenceToken("Test Mee"),
+        "$": ReferenceToken("$"),
         "Im a simple reference": ReferenceToken("Im a simple reference"),
         "Im a broken 12 reference": Failure,
         "a + b": Failure,
@@ -53,6 +54,7 @@ def test_simple_value_tokenization():
         "FUNC": ReservedToken("FUNC"),
         "`Testing`": StringToken("Testing"),
         "`ldksjj dljsj fjslkdj`": StringToken("ldksjj dljsj fjslkdj"),
+
     }
 
     results = collect_parsing_expectations(expectations, SimpleValueTokenizers.token)

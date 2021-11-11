@@ -64,6 +64,6 @@ class SimpleValueTokenizers(TextParsers):
 
     string_token = '`' >> reg(r"""[^`]+""") << '`' > to(StringToken)
 
-    reference_token = reg(r"""[A-Za-z\s]+""") > to(ReferenceToken)
+    reference_token = reg(r"""[A-Za-z\s]+|\$""") > to(ReferenceToken)
 
     token = longest(number_token, reserved_token, string_token, reference_token)

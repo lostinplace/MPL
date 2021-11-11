@@ -1,8 +1,9 @@
 from typing import Dict, Any
 
-from parsita import Success, Failure, lit
+from parsita import Success, Failure, lit, reg
 
 from Parser.Tokenizers.operator_tokenizers import MPLOperatorParsers, MPLOperator, StateOperator, StateOperatorParsers
+from Tests import collect_parsing_expectations
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -22,22 +23,27 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
 def test_mploperator_parsers():
     expectations = {
         '->': MPLOperator('ANY', 'CONSUME', 'STATE', 0),
-        '*-*': MPLOperator('EVENT', 'CONSUME', 'EVENT', 0),
-        '*~@': MPLOperator('EVENT', 'OBSERVE', 'ACTION', 0),
+        '*-*': MPLOperator('TRIGGER', 'CONSUME', 'TRIGGER', 0),
+        '*~@': MPLOperator('TRIGGER', 'OBSERVE', 'ACTION', 0),
+        '*~%': MPLOperator('TRIGGER', 'OBSERVE', 'SCENARIO', 0),
         '@~>': Failure,
         '|->': MPLOperator('FORK', 'CONSUME', 'STATE', 0),
         '|~@': MPLOperator('FORK', 'OBSERVE', 'ACTION', 0),
-        '   |~@': MPLOperator('FORK', 'OBSERVE', 'ACTION', 3),
     }
 
     results = assert_parsing_expectations(expectations, MPLOperatorParsers.operator)
 
 
 def test_mploperator_parsers_depth():
-    expectation = "1234 |-> 0123"
-    test_parser = lit('1234') >> MPLOperatorParsers.operator << '0123'
-    result = test_parser.parse(expectation)
-    assert result == Success(MPLOperator('FORK', 'CONSUME', 'STATE', 5))
+    expectations = {
+        "1234      |-> 0123": MPLOperator('FORK', 'CONSUME', 'STATE', 10)
+    }
+
+    parser = reg(r"\d+") >> MPLOperatorParsers.operator << reg(r"\d+")
+    results = collect_parsing_expectations(expectations, parser)
+
+    for result in results:
+        assert result.actual == result.expected
 
 
 def test_stateoperator_parsers():

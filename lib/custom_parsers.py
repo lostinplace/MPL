@@ -415,7 +415,7 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         last_success = None
         while isinstance(status, Continue):
             if self.repetition_maximum and self.repetition_maximum < len(output):
-                message = f"repetition count maximum {self.repetition_maximum} exceeded for {self.name_or_nothing()}"
+                message = f"at most {self.repetition_maximum} for {self.name_or_nothing()}"
                 return Backtrack(reader, lambda: message)
 
             active_separator = None
@@ -446,7 +446,7 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
         output_list.separators = separators
 
         if self.repetition_minimum and self.repetition_minimum > len(output):
-            message = f"repetition count minimum {self.repetition_minimum} not met for {self.name_or_nothing()}"
+            message = f"at least {self.repetition_minimum} for {self.__repr__()}"
             return Backtrack(reader, lambda: message)
 
         result_status = Continue(status.remainder, output_list).merge(status)

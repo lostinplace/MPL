@@ -4,7 +4,10 @@ from typing import Any, Dict, Iterator
 from parsita import Failure, Success
 
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers
+from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
+from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
 from Parser.Tokenizers.simple_value_tokenizer import NumberToken
 
@@ -63,22 +66,31 @@ def collect_parsing_expectations(expectations: Dict[str, Any], parser) -> Iterat
 
 
 def qdae(value):
-    """
-    quick define arithmetic expression
-
-    a helper method for defining expectations
-    :param args:
-    :return:
-    """
-    result = ArithmeticExpressionParsers.expression.parse(value)
-    return result.value
+    return quick_parse(ArithmeticExpression, value)
 
 
 def qre(value):
-    """
-    quickly build a reference expression
-    :param value:
-    :return:
-    """
-    result: Success = ReferenceExpressionParsers.expression.parse(value)
+    return quick_parse(ReferenceExpression, value)
+
+
+def qse(value):
+    return quick_parse(StateExpression, value)
+
+
+def qase(value):
+    return quick_parse(AssignmentExpression, value)
+
+
+parser_map ={
+    AssignmentExpression: AssignmentExpressionParsers.expression,
+    StateExpression: StateExpressionParsers.expression,
+    ReferenceExpression: ReferenceExpressionParsers.expression,
+    ArithmeticExpression: ArithmeticExpressionParsers.expression,
+    LogicalExpression: LogicalExpressionParsers.expression,
+}
+
+
+def quick_parse(out_type: type, value: str):
+    parser = parser_map[out_type]
+    result = parser.parse(value)
     return result.value

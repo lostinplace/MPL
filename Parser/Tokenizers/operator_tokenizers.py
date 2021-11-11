@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from parsita import TextParsers, lit, opt, rep, success
+from parsita import TextParsers, lit, opt, rep, success, reg, longest
 from parsita.util import splat
 
-from lib.custom_parsers import track
+from lib.custom_parsers import track, debug
 
 
 @dataclass(frozen=True, order=True)
@@ -17,13 +17,14 @@ class MPLOperator:
 
 S = {
     'ANY': None,
-    'EVENT': '*',
+    'TRIGGER': '*',
     'STATE': '>',
     'ACTION': '@',
     'FORK': '|',
     "CONSUME": '-',
     "OBSERVE": '~',
     "QUERY": '?',
+    "SCENARIO": '%',
 }
 
 s_inverted = dict(map(reversed, S.items()))
@@ -38,31 +39,45 @@ def interpret_operator(result):
     result = MPLOperator(lhs_out, middle_out, rhs_out, result.start)
     return result
 
+def cb(parser, reader):
+    result = parser.consume(reader)
+    pass
+
 
 class MPLOperatorParsers(TextParsers, whitespace=None):
-    ignored_whitespace = rep(lit(" ") | '\t')
+    ignored_whitespace = reg(r"[\s\t]*")
+    iw = ignored_whitespace
 
-    lhs = lit(S['EVENT']) | S['FORK']
+    lhs = lit(S['TRIGGER']) | S['FORK']
     middle = lit(S['CONSUME']) | S['OBSERVE']
-    rhs = lit(S['STATE']) | S['EVENT'] | S['ACTION'] | S['QUERY']
+    rhs = lit(S['STATE']) | S['TRIGGER'] | S['ACTION'] | S['QUERY']
 
-    left_trigger_operator = '*' & middle & rhs
-    right_trigger_operator = opt(lhs) & middle & '*'
-    trigger_operator = left_trigger_operator | right_trigger_operator
+    trigger_on_the_left_operator = iw >> '*' & middle & rhs << iw
+    trigger_on_the_right_operator = iw >> opt(lhs) & middle & '*' << iw
+    trigger_operator = iw >> (trigger_on_the_left_operator | trigger_on_the_right_operator) << iw
 
-    action_operator = opt(lhs) & middle & '@'
+    action_operator = iw >> opt(lhs) & middle & '@' << iw
 
-    left_state_operator = success(None) & middle & '>'
-    right_state_operator = opt(lhs) & middle & '>'
-    state_operator = left_state_operator | right_state_operator
+    state_on_the_left_operator = iw >> success(None) & middle & '>' << iw
+    state_on_the_right_operator = iw >> opt(lhs) & middle & '>' << iw
+    state_operator = iw >> state_on_the_left_operator | state_on_the_right_operator << iw
 
-    query_operator = opt(lhs) & middle & '?'
+    query_operator = iw >> opt(lhs) & middle & '?' << iw
 
-    fork_operator = '|' & middle & rhs
+    scenario_operator = iw >> opt(lhs) & middle & '%' << iw
 
-    any_operator = trigger_operator | action_operator | state_operator | query_operator | fork_operator
+    fork_operator = iw >> '|' & middle & rhs << iw
 
-    operator = ignored_whitespace >> track(any_operator) << ignored_whitespace > interpret_operator
+    any_operator = longest(
+        trigger_operator,
+        action_operator,
+        state_operator,
+        query_operator,
+        fork_operator,
+        scenario_operator
+    )
+
+    operator = iw >> track(any_operator) << iw > interpret_operator
 
 
 @dataclass(frozen=True, order=True)

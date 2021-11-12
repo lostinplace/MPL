@@ -7,7 +7,9 @@ from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpr
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
+from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
 from Parser.Tokenizers.simple_value_tokenizer import NumberToken
 
@@ -87,6 +89,8 @@ parser_map ={
     ReferenceExpression: ReferenceExpressionParsers.expression,
     ArithmeticExpression: ArithmeticExpressionParsers.expression,
     LogicalExpression: LogicalExpressionParsers.expression,
+    TriggerExpression: TriggerExpressionParsers.expression,
+    ScenarioExpression: ScenarioExpressionParsers.expression
 }
 
 

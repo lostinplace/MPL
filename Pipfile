@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 parsita = "==1.6.1"
 pytest = "*"
+coverage = "*"
 
 [dev-packages]
 

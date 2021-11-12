@@ -1,44 +1,73 @@
+from Parser.ExpressionParsers.logical_expression_parser import Negation
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateOperation, StateExpression
+from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from Parser.Tokenizers.operator_tokenizers import StateOperator
-from Tests import collect_parsing_expectations, qre
+from Tests import collect_parsing_expectations, qre, quick_parse
 
 
 def test_simple_state_expression_parsers():
     expectations = {
-        "END": StateExpression(
-            [qre('END')], []
+        'Smell Prey & !Feel Secure': StateExpression(
+            [
+                qre('Smell Prey'),
+                Negation(qre('Feel Secure'))
+            ],
+            [StateOperator('&')]
         ),
-        "VOID": StateExpression(
-            [qre('VOID')],
+        "keep calm & !<kill> the messenger | be uninformed": StateExpression(
+            [
+                qre('keep calm'),
+                Negation(
+                    quick_parse(TriggerExpression, '<kill> the messenger')
+                ),
+                qre('be uninformed')
+            ],
+            [
+                StateOperator('&'),
+                StateOperator('|')
+            ]
+        ),
+        "*": StateExpression(
+            [qre('void')], []
+        ),
+        "state & <trigger>": StateExpression(
+            [
+                qre('state'),
+                quick_parse(TriggerExpression, '<trigger>')
+            ],
+            [StateOperator('&')]
+        ),
+
+        "end": StateExpression(
+            [qre('end')],
             []
         ),
         "!(a & b)": StateExpression(
             [
-                StateExpression(
-                    [
-                        qre('a'),
-                        qre('b')
-                    ],
-                    [
-                        StateOperator('&')
-                    ]
+                Negation(
+                    StateExpression(
+                        [
+                            qre('a'),
+                            qre('b')
+                        ],
+                        [
+                            StateOperator('&')
+                        ]
+                    )
                 )
             ],
-            [
-                StateOperator('!')
-            ]
+            []
         ),
-
         "!c:STATE": StateExpression(
-            [qre('c:STATE')],
-            [StateOperator('!')]
+            [Negation( qre('c:STATE'))],
+            [],
         ),
         "test one:me & !c:STATE | d": StateExpression(
             [
                 qre('test one:me'),
-                StateExpression(
-                    [qre('c:STATE')],
-                    [StateOperator('!')]
+                Negation(
+                    quick_parse(ReferenceExpression, 'c:STATE')
                 ),
                 qre('d'),
             ],
@@ -56,7 +85,7 @@ def test_simple_state_expression_parsers():
                 qre('test two:again'),
                 qre('g:STATE'),
             ],
-            [ StateOperator('|') ]
+            [StateOperator('|')]
         )
     }
 

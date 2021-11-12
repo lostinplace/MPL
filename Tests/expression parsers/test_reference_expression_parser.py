@@ -1,6 +1,6 @@
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
     Reference
-from Parser.Tokenizers.simple_value_tokenizer import ReservedToken, ReferenceToken
+from Parser.Tokenizers.simple_value_tokenizer import ReferenceToken
 from Tests import collect_parsing_expectations
 
 
@@ -10,23 +10,23 @@ def test_reference_expression_parsers():
            Reference('a', None),
            []
         ),
-        "a:TEST": ReferenceExpression(
-            Reference('a',  ReservedToken("TEST")),
+        "a:test": ReferenceExpression(
+            Reference('a',  ReferenceToken("test")),
             []
         ),
-        "Wumpus: MACHINE": ReferenceExpression(
-            Reference('Wumpus', ReservedToken("MACHINE")),
+        "Wumpus: machine": ReferenceExpression(
+            Reference('Wumpus', ReferenceToken("machine")),
             []
         ),
         "Ok: Health": ReferenceExpression(
             Reference('Ok', ReferenceToken("Health")),
             []
         ),
-        "Health:STATE/Ok/Treatment:STATE": ReferenceExpression(
-            Reference('Treatment', ReservedToken("STATE")),
+        "//Health:state/Ok/Treatment:state": ReferenceExpression(
+            Reference('Treatment', ReferenceToken("state")),
             [
                 Reference('Ok', None),
-                Reference('Health', ReservedToken("STATE")),
+                Reference('Health', ReferenceToken("state")),
             ]
         ),
     }

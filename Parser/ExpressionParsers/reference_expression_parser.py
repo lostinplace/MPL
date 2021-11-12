@@ -11,11 +11,12 @@ REFERENCE_EXPRESSION = REFERENCE_TOKEN (: REFERENCE_EXPRESSION)?
 from dataclasses import dataclass
 from typing import Union, Optional, List
 
-from parsita import TextParsers, opt, longest
+from parsita import TextParsers, opt, longest, lit
 from parsita.util import splat
 
-from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers as svt, ReferenceToken, ReservedToken
-from lib.custom_parsers import repsep2, debug
+from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers as svt, ReferenceToken
+from lib.custom_parsers import debug
+from lib.repsep2 import repsep2
 
 
 def to(target_type):
@@ -27,7 +28,14 @@ def to(target_type):
 @dataclass(frozen=True, order=True)
 class Reference:
     name: str
-    type: Optional[Union[ReferenceToken, ReservedToken]]
+    type: Optional[str]
+
+
+@dataclass(frozen=True, order=True)
+class DeclarationExpression:
+    name: str
+    type: str
+    reference: Reference
 
 
 @dataclass(frozen=True, order=True)
@@ -36,23 +44,38 @@ class ReferenceExpression:
     lineage: List[Reference]
 
 
-def to_reference_operation(reference: ReferenceToken, type):
-    out_type = None
+def to_reference(reference: ReferenceToken, type):
     if type:
-        out_type = type[0]
-    return Reference(reference.content, out_type)
+        type_name = type[0].content
+        return Reference(reference.content, type_name)
+    return Reference(reference.content, None)
+
+
+def to_declaration(ref: Reference):
+    return DeclarationExpression(ref.name, ref.type, ref)
 
 
 def interpret_reference_expression(results):
-    tmp = list(reversed(results))
-    main_ref = tmp[0]
-    lineage = tmp[1:]
-    return ReferenceExpression(main_ref, lineage)
+    if isinstance(results, list):
+        tmp = list(reversed(results))
+        main_ref = tmp[0]
+        lineage = tmp[1:]
+        return ReferenceExpression(main_ref, lineage)
+    else:
+        return ReferenceExpression(results, [])
 
 
-class ReferenceExpressionParsers(TextParsers):
-    type_reference = longest(svt.reserved_token, svt.reference_token)
+class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
+    type_reference = svt.reference_token
 
-    reference_operation = svt.reference_token & opt(':' >> type_reference) > splat(to_reference_operation)
+    simple_reference = svt.reference_token & opt(':' >> type_reference) > splat(to_reference)
 
-    expression = repsep2(reference_operation, '/', min=1) > interpret_reference_expression
+    pathed_reference = '//' >> repsep2(simple_reference, '/', min=1)
+
+    simple_expression = simple_reference > interpret_reference_expression
+
+    pathed_expression = pathed_reference > interpret_reference_expression
+
+    declaration_expression = simple_reference > to_declaration
+
+    expression = pathed_expression | simple_expression

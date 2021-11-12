@@ -1,10 +1,13 @@
 from typing import Dict, Any
 
 from parsita import Success, lit, Failure, opt, Parser, TextParsers, reg, rep, repsep
+from parsita.parsers import RegexParser
 from parsita.state import Input, Output, StringReader, Continue
 
 from Tests import collect_parsing_expectations
-from lib.custom_parsers import excluding, at_least, check, best, track, repwksep, debug, ParseResult, back
+from lib.custom_parsers import excluding, check, debug, back
+from lib.additive_parsers import track, tag, TaggedValue, TrackedValue
+from lib.repsep2 import repsep2, SeparatedList
 
 
 def test_exclude_parser():
@@ -15,33 +18,10 @@ def test_exclude_parser():
     assert isinstance(result_2, Failure)
 
 
-def test_at_least_parser():
-    pattern = '+-'
-    tmp_parser = at_least(3, pattern)
-    for i in range(10):
-        test = pattern * i
-        result = tmp_parser.parse(test)
-        if(i<3):
-            assert isinstance(result, Failure)
-        else:
-            expected = [pattern for _ in range(i)]
-            assert result == Success(expected)
-
-
 def test_check_parser():
     tmp: Parser[Input, Output] = check("ok") & "ok ready to go"
     result = tmp.parse("ok ready to go")
     assert result == Success(['ok', "ok ready to go"])
-
-
-def test_best_alternative_parser():
-    non_greedy = (lit("ok") & opt("+")) | (lit("ok") & opt("-"))
-    tmp_greedy = best(non_greedy)
-
-    result_1 = non_greedy.parse("ok-")
-    assert isinstance(result_1, Failure)
-    result_2 = tmp_greedy.parse("ok-")
-    assert result_2 == Success(['ok', ['-']])
 
 
 def test_track_parser():
@@ -52,8 +32,27 @@ def test_track_parser():
     result = parser.parse(value)
 
     assert isinstance(result, Success)
-    assert result.value.value == '678'
-    assert result.value.start == 5
+
+    result_value: TrackedValue = result.value
+    assert result_value == '678'
+    assert result_value.metadata.start == 5
+
+    track('test')
+
+
+def test_tag_parser():
+    head_parser = lit('head ')
+    body_parser = lit('body')
+    tail_parser = lit(' tail')
+    content = 'head body tail'
+    tagged_body_parser = tag(body_parser, 'TESTING')
+
+    test_parser = head_parser >> tagged_body_parser << tail_parser
+    result = test_parser.parse(content)
+
+    assert isinstance(result, Success)
+    result_value: TaggedValue = result.value
+    assert result_value.tag == 'TESTING'
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -70,18 +69,55 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
     return results
 
 
-def test_repwksep_parser():
-    test_parser:Parser[Input, Input] = repwksep(lit('ok') | 'not ok', lit(',') | '+')
+def qsl(values, separators):
+    result = SeparatedList(values)
+    result.separators = separators
+    return result
+
+
+def test_repsep2_parser_basic():
+
+    test_parser:Parser[Input, Input] = repsep2(lit('ok') | 'not ok', lit(',') | '+')
 
     expectations = {
-        'ok,ok,not ok': [('ok', ','), ('ok', ','), 'not ok'],
-        'not ok+ok,ok': [('not ok', '+'), ('ok', ','), 'ok'],
+        'ok,ok,not ok': qsl(['ok','ok','not ok'], [',',',']),
+        'not ok+ok,ok': qsl(['not ok', 'ok', 'ok'], ['+', ',']),
         'not ok+ok,': Failure,
     }
 
-    assert_parsing_expectations(expectations, test_parser)
+    collect_parsing_expectations(expectations, test_parser)
 
-blah = 'testing'
+
+def test_repsep2_parser_reset():
+
+    content = \
+    """
+    test1
+        test2
+            test3
+            test4
+    test5""".strip('\n')
+
+    expected = [
+        ('test1', 4),
+        ('test2', 8),
+        ('test3', 12),
+        ('test4', 12),
+        ('test5', 4),
+    ]
+
+    def processor(result):
+        return result, result.metadata.start
+
+    iw = RegexParser(r"[ \t]*", None)
+    value = RegexParser(r"test\d", None)
+    line = iw >> track(value) > processor
+
+    test_parser = repsep2(line, '\n', reset=True)
+
+    actual = test_parser.parse(content)
+
+    assert actual == Success(expected)
 
 
 def test_debug_callback():
@@ -102,11 +138,9 @@ def test_debug_callback():
     TestParsers.c.parse("12345")
     assert result
     assert str(TestParsers.c) == "c = a & debug(b)"
-    assert blah == 'testing'
 
 
 def test_lookback():
-
 
     expectations = {
         "v/test/bp21": [

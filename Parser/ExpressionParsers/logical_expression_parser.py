@@ -6,20 +6,19 @@ from parsita import TextParsers, fwd, longest
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lep
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as aep, \
     ArithmeticExpression
-from Parser.Tokenizers.operator_tokenizers import StateOperator, LogicalOperatorParsers as lop, LogicalOperator
-from lib.custom_parsers import repsep2, SeparatedList, debug
+from Parser.Tokenizers.operator_tokenizers import LogicalOperatorParsers as lop, LogicalOperator
+from lib.repsep2 import repsep2, SeparatedList
 
 
 @dataclass(frozen=True, order=True)
-class LogicalOperation:
-    operand: Union[ReferenceExpression, 'LogicalExpression']
-    operator: Optional[LogicalOperator]
+class Negation:
+    operand: Union['LogicalExpression', 'ReferenceExpression', 'StateExpression']
 
 
 @dataclass(frozen=True, order=True)
 class LogicalExpression:
     operands: List[
-        Union[ReferenceExpression, ArithmeticExpression, 'LogicalExpression']
+        Union[ReferenceExpression, ArithmeticExpression, 'LogicalExpression', Negation]
     ]
     operators: List[
         LogicalOperator
@@ -27,9 +26,8 @@ class LogicalExpression:
 
 
 def interpret_negated_expression(parser_result):
-    operand = parser_result[1]
-    operator = parser_result[0]
-    result = LogicalExpression([operand], [operator])
+    operand = parser_result
+    result = Negation(operand)
     return result
 
 
@@ -41,7 +39,7 @@ def interpret_simple_expression(parser_results: SeparatedList):
     return result
 
 
-class LogicalExpressionParsers(TextParsers):
+class LogicalExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     simple_logical_expression = fwd()
     parenthesized_simple_expression = '(' >> simple_logical_expression << ')'
 
@@ -54,7 +52,7 @@ class LogicalExpressionParsers(TextParsers):
     )
 
     negated_expression.define(
-        lop.logical_negation & logical_expression_operand > interpret_negated_expression
+        lop.logical_negation >> logical_expression_operand > Negation
     )
 
     simple_logical_expression.define(

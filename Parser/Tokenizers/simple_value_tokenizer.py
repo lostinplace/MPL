@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
-from parsita import TextParsers, reg, success, longest
+from parsita import TextParsers, reg, longest
 
-from lib.custom_parsers import best
 
 """
 # Simple Value Tokenizer
@@ -21,15 +20,6 @@ class NumberToken:
 
 
 """
-> RESERVED = r/^[A-Z]+$/
-"""
-
-@dataclass(frozen=True, order=True)
-class ReservedToken:
-    content: str
-
-
-"""
 > STRING = r/`([^`]|\\`)*`/
 """
 
@@ -39,7 +29,7 @@ class StringToken:
 
 
 """
-> LABEL = r/[A-Za-z\s]+/
+> LABEL = r/[A-Za-z ]+/
 """
 
 
@@ -56,14 +46,12 @@ def to(target_type):
     return result_func
 
 
-class SimpleValueTokenizers(TextParsers):
+class SimpleValueTokenizers(TextParsers, whitespace=r'[ \t]*'):
     number_token = reg(r"""((?!-0?(\.0+)?(e|$))-?(0|[1-9]\d*)?(\.\d+)?(?<=\d)(e-?(0|[1-9]\d*))?|0x[0-9a-f]+)""") \
                    > to(NumberToken)
 
-    reserved_token = reg(r"[A-Z\-]+") > to(ReservedToken)
-
     string_token = '`' >> reg(r"""[^`]+""") << '`' > to(StringToken)
 
-    reference_token = reg(r"""[A-Za-z\s]+|\$""") > to(ReferenceToken)
+    reference_token = reg(r"""[A-Za-z ]+""") > to(ReferenceToken)
 
-    token = longest(number_token, reserved_token, string_token, reference_token)
+    token = longest(number_token, string_token, reference_token)

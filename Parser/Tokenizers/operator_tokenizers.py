@@ -4,7 +4,8 @@ from typing import Optional
 from parsita import TextParsers, lit, opt, rep, success, reg, longest
 from parsita.util import splat
 
-from lib.custom_parsers import track, debug
+from lib.custom_parsers import debug
+from lib.additive_parsers import track, TrackedValue
 
 
 @dataclass(frozen=True, order=True)
@@ -17,64 +18,44 @@ class MPLOperator:
 
 S = {
     'ANY': None,
-    'TRIGGER': '*',
-    'STATE': '>',
-    'ACTION': '@',
     'FORK': '|',
     "CONSUME": '-',
     "OBSERVE": '~',
-    "QUERY": '?',
-    "SCENARIO": '%',
+    'STATE': '>',
+    'ACTION': '@'
 }
 
 s_inverted = dict(map(reversed, S.items()))
 
 
-def interpret_operator(result):
-    lhs, middle, rhs = result.value
+def interpret_operator(result: TrackedValue):
+    lhs, middle, rhs = result
     lhs = lhs and lhs[0] or None
     lhs_out = s_inverted[lhs]
     middle_out = s_inverted[middle]
     rhs_out = s_inverted[rhs]
-    result = MPLOperator(lhs_out, middle_out, rhs_out, result.start)
+    result = MPLOperator(lhs_out, middle_out, rhs_out, result.metadata.start)
     return result
 
-def cb(parser, reader):
-    result = parser.consume(reader)
-    pass
+
+iw = reg(r'[ \t]*')
 
 
 class MPLOperatorParsers(TextParsers, whitespace=None):
-    ignored_whitespace = reg(r"[\s\t]*")
-    iw = ignored_whitespace
-
-    lhs = lit(S['TRIGGER']) | S['FORK']
+    lhs = lit(S['FORK'])
     middle = lit(S['CONSUME']) | S['OBSERVE']
-    rhs = lit(S['STATE']) | S['TRIGGER'] | S['ACTION'] | S['QUERY']
-
-    trigger_on_the_left_operator = iw >> '*' & middle & rhs << iw
-    trigger_on_the_right_operator = iw >> opt(lhs) & middle & '*' << iw
-    trigger_operator = iw >> (trigger_on_the_left_operator | trigger_on_the_right_operator) << iw
+    rhs = lit(S['STATE']) | S['ACTION']
 
     action_operator = iw >> opt(lhs) & middle & '@' << iw
 
-    state_on_the_left_operator = iw >> success(None) & middle & '>' << iw
-    state_on_the_right_operator = iw >> opt(lhs) & middle & '>' << iw
-    state_operator = iw >> state_on_the_left_operator | state_on_the_right_operator << iw
+    fork_operator = iw >> S['FORK'] & middle & rhs << iw
 
-    query_operator = iw >> opt(lhs) & middle & '?' << iw
-
-    scenario_operator = iw >> opt(lhs) & middle & '%' << iw
-
-    fork_operator = iw >> '|' & middle & rhs << iw
+    state_operator = iw >> opt(lhs) & middle & '>' << iw
 
     any_operator = longest(
-        trigger_operator,
         action_operator,
         state_operator,
-        query_operator,
-        fork_operator,
-        scenario_operator
+        fork_operator
     )
 
     operator = iw >> track(any_operator) << iw > interpret_operator
@@ -85,13 +66,13 @@ class StateOperator:
     contents: str
 
 
-class StateOperatorParsers(TextParsers):
+class StateOperatorParsers(TextParsers, whitespace=None):
     and_state = lit('&') > StateOperator
     or_state = lit('|') > StateOperator
 
     not_state = lit('!') > StateOperator
 
-    operator = and_state | or_state
+    operator = iw >> (and_state | or_state) << iw
 
 
 @dataclass(frozen=True, order=True)
@@ -99,7 +80,7 @@ class LogicalOperator:
     contents: str
 
 
-class LogicalOperatorParsers(TextParsers):
+class LogicalOperatorParsers(TextParsers, whitespace=None):
     logical_negation = lit('!') > LogicalOperator
 
     logical_and = lit('&&') > LogicalOperator
@@ -111,8 +92,11 @@ class LogicalOperatorParsers(TextParsers):
     logical_lt = lit('<') > LogicalOperator
     logical_lte = lit('<=') > LogicalOperator
 
-    operator = logical_and | logical_or | logical_equals | logical_not_equals | logical_gt | \
-               logical_gte | logical_lt | logical_lte
+    all_operators = longest(
+        logical_and, logical_or, logical_equals, logical_not_equals, logical_gt, logical_gte, logical_lt, logical_lte
+    )
+
+    operator = iw >> all_operators << iw
 
 
 @dataclass(frozen=True, order=True)
@@ -120,7 +104,7 @@ class ArithmeticOperator:
     contents: str
 
 
-class ArithmeticOperatorParsers(TextParsers):
+class ArithmeticOperatorParsers(TextParsers, whitespace=None):
     arith_add = lit('+') > ArithmeticOperator
     arith_subtract = lit('-') > ArithmeticOperator
     arith_multiply = lit('*') > ArithmeticOperator
@@ -128,7 +112,7 @@ class ArithmeticOperatorParsers(TextParsers):
     arith_exponent = lit('^') > ArithmeticOperator
     arith_modulus = lit('%') > ArithmeticOperator
 
-    operator = arith_add | arith_subtract | arith_multiply | arith_divide | arith_exponent | arith_modulus
+    operator = iw >> (arith_add | arith_subtract | arith_multiply | arith_divide | arith_exponent | arith_modulus) << iw
 
 
 @dataclass(frozen=True, order=True)
@@ -136,11 +120,11 @@ class AssignmentOperator:
     contents: str
 
 
-class AssignmentOperatorParsers(TextParsers):
+class AssignmentOperatorParsers(TextParsers, whitespace=None):
     assign_direct = lit('=') > AssignmentOperator
     assign_increment = lit('+=') > AssignmentOperator
     assign_decrement = lit('-=') > AssignmentOperator
     assign_multiply = lit('*=') > AssignmentOperator
     assign_divide = lit('/=') > AssignmentOperator
 
-    operator = assign_direct | assign_increment | assign_decrement | assign_multiply | assign_divide
+    operator = iw >> (assign_direct | assign_increment | assign_decrement | assign_multiply | assign_divide) << iw

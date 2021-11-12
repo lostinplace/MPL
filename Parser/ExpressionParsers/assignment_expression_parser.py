@@ -28,7 +28,7 @@ def interpret_to(default_dataclass, keys: typing.List[str]):
     return interpret_parser_results
 
 
-class AssignmentExpressionParsers(TextParsers):
+class AssignmentExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 
     expression = lep.expression & aop.operator & aep.expression > \
                  interpret_to(default_assignment_expression, ['lhs', 'operator', 'rhs'])

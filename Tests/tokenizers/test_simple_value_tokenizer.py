@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from parsita import Success, Failure
 
-from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, ReservedToken, StringToken, ReferenceToken
+from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, StringToken, ReferenceToken
 from Tests import collect_parsing_expectations
 
 
@@ -29,7 +29,6 @@ def test_simple_value_tokenization():
         "t`dsf`": Failure,
         "a": ReferenceToken('a'),
         "Test Mee": ReferenceToken("Test Mee"),
-        "$": ReferenceToken("$"),
         "Im a simple reference": ReferenceToken("Im a simple reference"),
         "Im a broken 12 reference": Failure,
         "a + b": Failure,
@@ -40,18 +39,7 @@ def test_simple_value_tokenization():
         "-10.556": NumberToken("-10.556"),
         "12e-5": NumberToken("12e-5"),
         "123": NumberToken("123"),
-        "MACHINE": ReservedToken("MACHINE"),
-        "STATE": ReservedToken("STATE"),
-        "TRIGGER": ReservedToken("TRIGGER"),
-        "INT": ReservedToken("INT"),
-        "DOUBLE": ReservedToken("DOUBLE"),
-        "STRING": ReservedToken("STRING"),
-        "SET": ReservedToken("SET"),
-        "DICT": ReservedToken("DICT"),
-        "BOOL": ReservedToken("BOOL"),
-        "NO-CACHE": ReservedToken("NO-CACHE"),
-        "MACHINE": ReservedToken("MACHINE"),
-        "FUNC": ReservedToken("FUNC"),
+        "MACHINE": ReferenceToken("MACHINE"),
         "`Testing`": StringToken("Testing"),
         "`ldksjj dljsj fjslkdj`": StringToken("ldksjj dljsj fjslkdj"),
 

@@ -1,7 +1,7 @@
 import unittest
 
-from Parser.ExpressionParsers.logical_expression_parser import LogicalOperation, LogicalExpression, \
-    LogicalExpressionParsers
+from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, \
+    LogicalExpressionParsers, Negation
 from Parser.Tokenizers.operator_tokenizers import LogicalOperator
 from Tests import collect_parsing_expectations, qre, qdae
 
@@ -9,12 +9,21 @@ from Tests import collect_parsing_expectations, qre, qdae
 def test_logical_expression_parsers():
 
     expectations = {
-        "a && (brett + 7 != 4) || d": LogicalExpression(
+        "a && !b": LogicalExpression(
             [
                 qre('a'),
-                LogicalExpression(
-                    [qdae('brett + 7'), qdae('4')],
-                    [LogicalOperator("!=")]
+                Negation(qre('b'))
+            ],
+            [LogicalOperator('&&')]
+        ),
+        "a && !(brett + 7 != 4) || d": LogicalExpression(
+            [
+                qre('a'),
+                Negation(
+                    LogicalExpression(
+                        [qdae('brett + 7'), qdae('4')],
+                        [LogicalOperator("!=")]
+                    )
                 ),
                 qre('d'),
             ],

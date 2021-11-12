@@ -23,9 +23,7 @@ def assert_parsing_expectations(expectations: Dict[str, Any], parser):
 def test_mploperator_parsers():
     expectations = {
         '->': MPLOperator('ANY', 'CONSUME', 'STATE', 0),
-        '*-*': MPLOperator('TRIGGER', 'CONSUME', 'TRIGGER', 0),
-        '*~@': MPLOperator('TRIGGER', 'OBSERVE', 'ACTION', 0),
-        '*~%': MPLOperator('TRIGGER', 'OBSERVE', 'SCENARIO', 0),
+        '~@': MPLOperator('ANY', 'OBSERVE', 'ACTION', 0),
         '@~>': Failure,
         '|->': MPLOperator('FORK', 'CONSUME', 'STATE', 0),
         '|~@': MPLOperator('FORK', 'OBSERVE', 'ACTION', 0),

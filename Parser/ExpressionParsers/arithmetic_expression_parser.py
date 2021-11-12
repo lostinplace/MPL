@@ -6,7 +6,7 @@ from parsita import TextParsers, fwd, longest
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lexp
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator, ArithmeticOperatorParsers as aop
 from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers as svt
-from lib.custom_parsers import best, repwksep, repsep2
+from lib.repsep2 import repsep2
 
 
 @dataclass(frozen=True, order=True)
@@ -29,7 +29,7 @@ def interpret_simple_expression(parser_results):
     return result
 
 
-class ArithmeticExpressionParsers(TextParsers):
+class ArithmeticExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     simple_arithmetic_expression = fwd()
     parenthesized_simple_expression = '(' >> simple_arithmetic_expression << ')'
 

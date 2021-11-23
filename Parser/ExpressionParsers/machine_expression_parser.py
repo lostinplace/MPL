@@ -10,10 +10,9 @@ from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpres
     ReferenceExpressionParsers as RefExP, DeclarationExpression
 from Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers as RuleExP
 
-from lib.additive_parsers import track
+from lib.additive_parsers import track, TrackedValue
 from lib.custom_parsers import check
-from lib.tree_parser import tree, DefinitionTreeNode
-from lib.repsep2 import repsep2
+from lib.repsep2 import repsep2, SeparatedList
 
 
 def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]:
@@ -48,5 +47,12 @@ class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
     empty_line = iw & check('\n')
     valid_line = longest(empty_line, declaration_line, rule_line)
     rule_lines = repsep2(valid_line, '\n', reset=True, min=1)
-    machine_file = tree(rule_lines)
+    machine_file = rule_lines
 
+
+def parse_machine_file(path: str) -> SeparatedList(str | DeclarationExpression | RuleExpression | TrackedValue):
+    with open(path) as f:
+        content = f.read()
+
+    result = MachineDefinitionExpressionParsers.machine_file.parse(content)
+    return result

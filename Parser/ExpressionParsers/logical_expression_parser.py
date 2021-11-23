@@ -5,8 +5,9 @@ from typing import Union, List, Optional, Tuple
 
 from parsita import TextParsers, fwd, longest
 
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lep
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as aep, \
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
+    ReferenceExpressionParsers as RefExP
+from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as ArExP, \
     ArithmeticExpression
 from Parser.Tokenizers.operator_tokenizers import LogicalOperatorParsers as lop, LogicalOperator
 from lib.repsep2 import repsep2, SeparatedList
@@ -49,8 +50,8 @@ class LogicalExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     logical_expression_operand = longest(
         parenthesized_simple_expression, \
         negated_expression, \
-        lep.expression, \
-        aep.expression
+        RefExP.expression, \
+        ArExP.expression
     )
 
     negated_expression.define(

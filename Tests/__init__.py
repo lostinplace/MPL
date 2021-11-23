@@ -6,7 +6,8 @@ from parsita import Failure, Success
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
+    DeclarationExpression
 from Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
@@ -93,6 +94,7 @@ parser_map ={
     TriggerExpression: TriggerExpressionParsers.expression,
     ScenarioExpression: ScenarioExpressionParsers.expression,
     RuleExpression: RuleExpressionParsers.expression,
+    DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
 }
 
 

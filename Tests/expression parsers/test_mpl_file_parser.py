@@ -1,12 +1,10 @@
 from parsita import Success
 
-from Parser.ExpressionParsers.machine_expression_parser import MachineDefinitionExpressionParsers as MDExP
+from Parser.ExpressionParsers.machine_expression_parser import MachineDefinitionExpressionParsers as MDExP, \
+    parse_machine_file
 
 
 def test_mpl_file_parser():
-    with open('Tests/test_files/simple_wumpus.mpl') as f:
-        content = f.read()
-
-    result = MDExP.machine_file.parse(content)
+    result = parse_machine_file('Tests/test_files/simple_wumpus.mpl')
 
     assert isinstance(result, Success)

@@ -105,4 +105,4 @@ def test_rule_expression_parsers():
 
     for result in collect_parsing_expectations(expectations, RuleExpressionParsers.expression ):
         result = result.as_strings()
-        assert result.actual == result.expected
+        assert result.actual.replace('Tracked', '') == result.expected

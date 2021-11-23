@@ -9,6 +9,7 @@ from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressi
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers as LExP
 from Parser.ExpressionParsers.state_expression_parser import StateExpression, StateExpressionParsers as SExP
 from Parser.Tokenizers.operator_tokenizers import MPLOperator, MPLOperatorParsers as MOPs
+from lib.additive_parsers import track
 from lib.custom_parsers import debug, check, back
 from lib.repsep2 import repsep2, SeparatedList
 
@@ -16,7 +17,7 @@ from lib.repsep2 import repsep2, SeparatedList
 @dataclass(frozen=True, order=True)
 class RuleClause:
     type: str
-    expression: Union[StateExpression, LogicalExpression, AssignmentExpression, ArithmeticExpression]
+    expression: StateExpression | LogicalExpression | AssignmentExpression | ArithmeticExpression
 
 
 @dataclass(frozen=True, order=True)
@@ -31,7 +32,7 @@ def to_clause(clause_type):
     return result_func
 
 
-def interpret_simple_expression(parser_results: SeparatedList):
+def interpret_simple_expression(parser_results: SeparatedList) -> RuleExpression:
     operands = tuple(parser_results.__iter__())
     operators = parser_results.separators
 
@@ -59,6 +60,6 @@ class RuleExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 
     action_clause = opt(back(MOPs.action_operator)) >> AsExP.expression > to_clause('action')
 
-    any_clause = longest(state_clause, query_clause, action_clause, scenario_clause)
+    any_clause = track(longest(state_clause, query_clause, action_clause, scenario_clause))
 
     expression = repsep2(any_clause, MOPs.operator, min=1) > interpret_simple_expression

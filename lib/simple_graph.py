@@ -1,12 +1,13 @@
 import dataclasses
-from typing import Set, Iterable
+from typing import Set, Iterable, Any, Tuple
+
 
 @dataclasses.dataclass
 class SimpleGraph:
     vertices: Set
     edges: Set
 
-    def __init__(self, verts: Iterable= None, edges:Iterable = None):
+    def __init__(self, verts: Iterable[Any] = set(), edges:Iterable[Tuple[Any, Any, Any]] = set()):
         self.vertices = set(verts or [])
         self.edges = set(edges or [])
 

@@ -3,6 +3,7 @@ from typing import Optional
 
 from parsita import TextParsers, lit, opt, rep, success, reg, longest
 from parsita.util import splat
+from pip._internal.utils.misc import enum
 
 from lib.custom_parsers import debug
 from lib.additive_parsers import track, TrackedValue

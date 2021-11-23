@@ -1,5 +1,5 @@
 from dataclasses import replace, dataclass
-from typing import Any, Dict, Iterator
+from typing import Any, Dict, Iterator, Generic, TypeVar
 
 from parsita import Failure, Success
 
@@ -7,6 +7,7 @@ from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpr
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
@@ -90,11 +91,15 @@ parser_map ={
     ArithmeticExpression: ArithmeticExpressionParsers.expression,
     LogicalExpression: LogicalExpressionParsers.expression,
     TriggerExpression: TriggerExpressionParsers.expression,
-    ScenarioExpression: ScenarioExpressionParsers.expression
+    ScenarioExpression: ScenarioExpressionParsers.expression,
+    RuleExpression: RuleExpressionParsers.expression,
 }
 
 
-def quick_parse(out_type: type, value: str):
+T = TypeVar('T')
+
+
+def quick_parse(out_type: Generic[T], value: str) -> T:
     parser = parser_map[out_type]
     result = parser.parse(value)
     return result.value

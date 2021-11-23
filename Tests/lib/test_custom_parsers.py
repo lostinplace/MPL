@@ -98,13 +98,13 @@ def test_repsep2_parser_reset():
             test4
     test5""".strip('\n')
 
-    expected = [
+    expected = (
         ('test1', 4),
         ('test2', 8),
         ('test3', 12),
         ('test4', 12),
         ('test5', 4),
-    ]
+    )
 
     def processor(result):
         return result, result.metadata.start

@@ -7,27 +7,27 @@ from Tests import collect_parsing_expectations
 def test_reference_expression_parsers():
     expectations = {
         "a": ReferenceExpression(
-           Reference('a', None),
-           []
+            Reference('a', None),
+            ()
         ),
         "a:test": ReferenceExpression(
-            Reference('a',  ReferenceToken("test")),
-            []
+            Reference('a', "test"),
+            ()
         ),
         "Wumpus: machine": ReferenceExpression(
-            Reference('Wumpus', ReferenceToken("machine")),
-            []
+            Reference('Wumpus', "machine"),
+            ()
         ),
         "Ok: Health": ReferenceExpression(
-            Reference('Ok', ReferenceToken("Health")),
-            []
+            Reference('Ok', "Health"),
+            ()
         ),
         "//Health:state/Ok/Treatment:state": ReferenceExpression(
-            Reference('Treatment', ReferenceToken("state")),
-            [
+            Reference('Treatment', "state"),
+            (
                 Reference('Ok', None),
-                Reference('Health', ReferenceToken("state")),
-            ]
+                Reference('Health', "state"),
+            )
         ),
     }
 

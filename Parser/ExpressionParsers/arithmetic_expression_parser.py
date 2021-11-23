@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union, List, Tuple
 
 from parsita import TextParsers, fwd, longest
 
@@ -17,12 +19,12 @@ class ArithmeticOperation:
 
 @dataclass(frozen=True, order=True)
 class ArithmeticExpression:
-    operands: List[Union[NumberToken, ReferenceExpression, 'ArithmeticExpression']]
-    operators: List[ArithmeticOperator]
+    operands: Tuple[NumberToken | ReferenceExpression | 'ArithmeticExpression']
+    operators: Tuple[ArithmeticOperator]
 
 
 def interpret_simple_expression(parser_results):
-    operands = parser_results
+    operands = tuple(parser_results)
     operators = parser_results.separators
 
     result = ArithmeticExpression(operands, operators)

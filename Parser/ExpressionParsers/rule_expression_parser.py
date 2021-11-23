@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
 from parsita import TextParsers, fwd, longest, pred, opt
 
@@ -21,8 +21,8 @@ class RuleClause:
 
 @dataclass(frozen=True, order=True)
 class RuleExpression:
-    clauses: List[RuleClause]
-    operators: List[MPLOperator]
+    clauses: Tuple[RuleClause]
+    operators: Tuple[MPLOperator]
 
 
 def to_clause(clause_type):
@@ -32,7 +32,7 @@ def to_clause(clause_type):
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
-    operands = parser_results
+    operands = tuple(parser_results.__iter__())
     operators = parser_results.separators
 
     result = RuleExpression(operands, operators)
@@ -57,7 +57,7 @@ class RuleExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     scenario_clause = pred(prior_operator, is_scenario_compatible, 'is_scenario_compatible') \
                       >> ScExP.expression > to_clause('scenario')
 
-    action_clause = back(MOPs.action_operator) >> AsExP.expression > to_clause('action')
+    action_clause = opt(back(MOPs.action_operator)) >> AsExP.expression > to_clause('action')
 
     any_clause = longest(state_clause, query_clause, action_clause, scenario_clause)
 

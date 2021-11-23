@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
 from parsita import TextParsers, fwd, longest
 
@@ -17,10 +19,10 @@ class Negation:
 
 @dataclass(frozen=True, order=True)
 class LogicalExpression:
-    operands: List[
-        Union[ReferenceExpression, ArithmeticExpression, 'LogicalExpression', Negation]
+    operands: Tuple[
+        ReferenceExpression | ArithmeticExpression | 'LogicalExpression' | Negation
     ]
-    operators: List[
+    operators: Tuple[
         LogicalOperator
     ]
 
@@ -32,7 +34,7 @@ def interpret_negated_expression(parser_result):
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
-    operands = parser_results
+    operands = tuple(parser_results.__iter__())
     operators = parser_results.separators
 
     result = LogicalExpression(operands, operators)

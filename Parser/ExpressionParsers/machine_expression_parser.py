@@ -16,20 +16,6 @@ from lib.tree_parser import tree, DefinitionTreeNode
 from lib.repsep2 import repsep2
 
 
-@dataclass(frozen=True, order=True)
-class StateDefinitionExpression:
-    name: str
-    rules: List[DeclarationExpression | RuleExpression]
-
-
-@dataclass(frozen=True, order=True)
-class MachineDefinitionExpression:
-    name: str
-    rules: List[
-        RuleExpression | DeclarationExpression | 'MachineDefinitionExpression'
-    ]
-
-
 def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]:
     if len(rule_expression.clauses) != 1:
         return None
@@ -51,13 +37,6 @@ def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]
         return None
 
     return ref_name, ref_type
-
-
-def compact_tree(a_tree: DefinitionTreeNode):
-    def_expression: RuleExpression = a_tree.definition_expression
-    definition = get_definition(def_expression)
-    if definition == 'state':
-        pass
 
 
 class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):

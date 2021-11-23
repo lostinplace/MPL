@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Generic, Sequence, Union
 from parsita import Parser, lit, TextParsers
 from parsita.state import Input, Output, Continue, Reader
+
+from Parser.ExpressionParsers.reference_expression_parser import DeclarationExpression
 from Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from lib.additive_parsers import TrackedValue
 from lib.repsep2 import SeparatedList
@@ -11,9 +13,9 @@ from lib.repsep2 import SeparatedList
 
 @dataclass(frozen=True, order=True)
 class DefinitionTreeNode:
-    definition_expression: RuleExpression | TrackedValue
+    definition_expression: RuleExpression | DeclarationExpression | TrackedValue
     parent: DefinitionTreeNode
-    children: RuleExpression | 'DefinitionTreeNode'
+    children: RuleExpression | DeclarationExpression | 'DefinitionTreeNode'
 
 
 class TreeConversionParser(Generic[Input, Output], Parser[Input, Sequence[Output]]):

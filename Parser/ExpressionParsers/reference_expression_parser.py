@@ -9,7 +9,7 @@ Reference Expressions can be presented with or without parent types and any dept
 REFERENCE_EXPRESSION = REFERENCE_TOKEN (: REFERENCE_EXPRESSION)?
 """
 from dataclasses import dataclass
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Tuple, Iterable
 
 from parsita import TextParsers, opt, longest, lit
 from parsita.util import splat
@@ -41,7 +41,7 @@ class DeclarationExpression:
 @dataclass(frozen=True, order=True)
 class ReferenceExpression:
     value: Reference
-    lineage: List[Reference]
+    lineage: Tuple[Reference]
 
 
 def to_reference(reference: ReferenceToken, type):
@@ -56,13 +56,13 @@ def to_declaration(ref: Reference):
 
 
 def interpret_reference_expression(results):
-    if isinstance(results, list):
-        tmp = list(reversed(results))
+    if isinstance(results, Iterable):
+        tmp = tuple(reversed(results))
         main_ref = tmp[0]
-        lineage = tmp[1:]
+        lineage = tuple(tmp[1:])
         return ReferenceExpression(main_ref, lineage)
     else:
-        return ReferenceExpression(results, [])
+        return ReferenceExpression(results, tuple([]))
 
 
 class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):

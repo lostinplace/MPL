@@ -5,11 +5,18 @@ from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressi
 from Parser.ExpressionParsers.state_expression_parser import StateExpression
 from Parser.Tokenizers.operator_tokenizers import MPLOperator
 from Tests import qre, collect_parsing_expectations, qse, quick_parse
-from lib.custom_parsers import debug
 
 
 def test_rule_expression_parsers():
     expectations = {
+        '!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure': RuleExpression(
+            (
+                RuleClause('state', quick_parse(StateExpression, '!Smell Prey & Flee')),
+                RuleClause('action', quick_parse(AssignmentExpression, 'noise = `safe`')),
+                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+            ),
+            (MPLOperator('ANY', 'OBSERVE', 'ACTION', 19), MPLOperator('ANY', 'OBSERVE', 'STATE', 37))
+        ),
         'Smell Prey & !Feel Secure ~> Wander -> Flee': RuleExpression(
             (
                 RuleClause('state', quick_parse(StateExpression, 'Smell Prey & !Feel Secure')),

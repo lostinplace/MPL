@@ -13,7 +13,7 @@ from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressi
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken
+from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers, StringToken
 
 
 @dataclass(frozen=True, order=True)
@@ -95,6 +95,7 @@ parser_map ={
     ScenarioExpression: ScenarioExpressionParsers.expression,
     RuleExpression: RuleExpressionParsers.expression,
     DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
+    StringToken: SimpleValueTokenizers.string_token,
 }
 
 

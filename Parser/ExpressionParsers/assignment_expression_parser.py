@@ -9,12 +9,13 @@ from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpr
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers as LoExP
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lep
 from Parser.Tokenizers.operator_tokenizers import AssignmentOperator, AssignmentOperatorParsers as aop
+from Parser.Tokenizers.simple_value_tokenizer import StringToken, SimpleValueTokenizers as svt
 
 
 @dataclass(frozen=True, order=True)
 class AssignmentExpression:
     lhs: ReferenceExpression
-    rhs: ArithmeticExpression | LogicalExpression
+    rhs: ArithmeticExpression | LogicalExpression | StringToken
     operator: AssignmentOperator
 
 
@@ -33,5 +34,5 @@ def interpret_to(default_dataclass, keys: typing.List[str]):
 
 class AssignmentExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 
-    expression = lep.expression & aop.operator & longest(aep.expression, LoExP.expression) > \
+    expression = lep.expression & aop.operator & longest(svt.string_token, aep.expression, LoExP.expression) > \
                  interpret_to(default_assignment_expression, ['lhs', 'operator', 'rhs'])

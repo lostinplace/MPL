@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import dataclasses
+import enum
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generic, Sequence, Union, Tuple, Any, List
-from parsita import Parser, lit, TextParsers
-from parsita.state import Input, Output, Continue, Reader
+from typing import Tuple, List, Any, Dict
+
+from networkx import DiGraph, dfs_tree, dfs_labeled_edges, get_edge_attributes
+from parsita.state import Input, Continue, Reader
 
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
@@ -15,7 +19,10 @@ from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressi
 from Parser.ExpressionParsers.state_expression_parser import StateExpression
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from Parser.Tokenizers.operator_tokenizers import MPLOperator
+from Parser.Tokenizers.simple_value_tokenizer import StringToken
 from lib.additive_parsers import TrackedValue
+from lib.invert_dict import invert_dict
+from lib.quick_filter_set import filter_set
 from lib.repsep2 import SeparatedList
 from lib.simple_graph import SimpleGraph
 
@@ -25,57 +32,6 @@ class DefinitionTreeNode:
     definition_expression: RuleExpression | DeclarationExpression | TrackedValue
     parent: DefinitionTreeNode
     children: Tuple[RuleExpression | DeclarationExpression | 'DefinitionTreeNode']
-
-
-def consume(self, reader: Reader[Input]):
-    """
-    This is left here for posterity, it's the old 'tree parser'
-    :param self:
-    :param reader:
-    :return:
-    """
-    status = self.parser.consume(reader)
-    if not isinstance(status, Continue):
-        return status
-
-    output = []
-    current_depth = 0
-    current_node: DefinitionTreeNode = None
-
-    result: TrackedValue
-    status.value: SeparatedList
-
-    for result in status.value:
-        if not isinstance(result, TrackedValue):
-            continue
-        this_line_depth = result.metadata.start
-
-        if this_line_depth == 0:
-            if current_node:
-                while current_node.parent is not None:
-                    current_node = current_node.parent
-                output.append(current_node)
-            this_node = DefinitionTreeNode(result, None, [])
-        elif this_line_depth > current_depth:
-            this_node = DefinitionTreeNode(result, current_node, [])
-            current_node.children.append(this_node)
-        elif this_line_depth == current_depth:
-            this_node = DefinitionTreeNode(result, current_node.parent, [])
-            this_node.parent.children.append(this_node)
-        elif this_line_depth < current_depth:
-            while current_node.definition_expression.metadata.start > this_line_depth:
-                current_node = current_node.parent
-            this_node = DefinitionTreeNode(result, current_node.parent, [])
-            this_node.parent.children.append(this_node)
-        current_node = this_node
-        current_depth = this_line_depth
-
-    while current_node.parent is not None:
-        current_node = current_node.parent
-
-    output = output + [current_node]
-    status.value = tuple(output)
-    return status
 
 
 #TODO: Unify Arithmetic expression and State expression
@@ -111,27 +67,28 @@ class MPLEntityClass(Enum):
     TRIGGER = 3
 
 
-class MPLValueType(Enum):
-    ANY = 0
-    NUMBER = 1
-    ENTITY = 2
-    STRING = 3
+class MPLValueType(enum.Flag):
+    NONE = enum.auto()
+    NUMBER = enum.auto()
+    ENTITY = enum.auto()
+    STRING = enum.auto()
+    ANY = NUMBER | ENTITY | STRING
     
 
-class MPLGraphEdgeType(Enum):
-    DEFINED_BY         = 0
-    QUALIFIED_BY       = 1 << 0
-    INSTANTIATED_AS    = 1 << 1
-    CHILD_OF           = 1 << 2
-    EXCLUSIVE_CHILD_OF = 1 << 3
-    EVALUATED_IN       = 1 << 4
-    CHANGED_IN         = 1 << 5
+class MPLGraphEdgeType(enum.Flag):
+    DEFINED_BY = enum.auto()
+    QUALIFIED_BY = enum.auto()
+    INSTANTIATED_AS = enum.auto()
+    CHILD_OF = enum.auto()
+    EXCLUSIVE_CHILD_OF = enum.auto()
+    EVALUATED_IN = enum.auto()
+    CHANGED_IN = enum.auto()
 
 
 # TODO: add block operator  a -| b
 # TODO: Observations create novel "Observation" values without consuming the value of the previous clause
 # TODO: collecting from multiple sources combines their values, neeed to figure out extrication of values from a collection
-# TODO: MPL CLauses should track an MPLLine for just their source
+# TODO: MPL Clauses should track an MPLLine for just their source
 
 
 @dataclass(frozen=True, order=True)
@@ -154,25 +111,69 @@ def reference_to_simple_graph(ref: Reference) -> SimpleGraph:
     out_edges = set()
 
     if ref.type:
-        simple_ref = Reference(ref.name, None)
+        simple_ref = dataclasses.replace(ref, type=None)
         out_verts.add(simple_ref)
         out_edges.add((simple_ref, MPLGraphEdgeType.QUALIFIED_BY, ref))
+
     return SimpleGraph(out_verts, out_edges)
+
+
+def complex_expression_to_reference_graph(
+        expr: ArithmeticExpression | LogicalExpression | StateExpression | ScenarioExpression | AssignmentExpression,
+        include_negations=True
+):
+    out = SimpleGraph()
+
+    match expr:
+        case ScenarioExpression(value):
+            return complex_expression_to_reference_graph(value)
+        case AssignmentExpression(lhs, rhs, _):
+            lhs: ReferenceExpression
+            out.vertices.add(lhs.value)
+            return out | complex_expression_to_reference_graph(rhs)
+        case StringToken(_):
+            return out
+
+    for operand in expr.operands:
+        if isinstance(operand, ReferenceExpression):
+            out |= reference_to_simple_graph(operand.value)
+        elif isinstance(operand, (ArithmeticExpression, StateExpression, LogicalExpression)):
+            out |= complex_expression_to_reference_graph(operand)
+        elif isinstance(operand, TriggerExpression):
+            out |= reference_to_simple_graph(operand.name)
+        elif isinstance(operand, Negation):
+            tmp = operand
+            while isinstance(tmp, Negation):
+                tmp = tmp.operand
+            if isinstance(tmp, ReferenceExpression) and include_negations:
+                out |= reference_to_simple_graph(tmp.value)
+            else:
+                out |= complex_expression_to_reference_graph(operand)
+    return out
+
+
+def expression_with_metadata_to_mpl_line(expr: RuleExpression | DeclarationExpression | TrackedValue, line_number) -> MPLLine:
+    return MPLLine(line_number, expr.metadata.start, expr.metadata.source)
 
 
 def declaration_expression_to_simple_graph(
         expression: DeclarationExpression | TrackedValue,
-        line_number: int
-) -> SimpleGraph:
-    line = MPLLine(line_number, expression.metadata.start, expression.metadata.source)
-    result = reference_to_simple_graph(expression.reference)
+        mpl_line: MPLLine
+) -> Tuple[SimpleGraph, MPLEntityClass, MPLValueType]:
+
+    #TODO:  this is a hack, we assumme that untyped declarations are states
+    ref = expression.reference
+    if not ref.type:
+        ref = dataclasses.replace(ref, type='state')
+
+    result = reference_to_simple_graph(ref)
     for v in result.vertices:
-        result.edges.add((v, MPLGraphEdgeType.DEFINED_BY, line))
-    result.vertices.add(line)
+        result.edges.add((v, MPLGraphEdgeType.DEFINED_BY, mpl_line))
+    result.vertices.add(mpl_line)
 
-    entity_id = get_entity_id(line)
+    entity_id = get_entity_id(mpl_line)
 
-    match expression.reference.type:
+    match ref.type:
         case 'machine':
             entity_class = MPLEntityClass.MACHINE
             value_type = MPLValueType.ANY
@@ -183,19 +184,19 @@ def declaration_expression_to_simple_graph(
             entity_class = MPLEntityClass.VARIABLE
             value_type = value or MPLValueType.ANY
 
-    entity = MPLEntity(entity_id, expression.reference.name, entity_class, value_type, None)
+    entity = MPLEntity(entity_id, ref.name, entity_class, value_type, None)
     result.vertices.add(entity)
-    result.edges.add((expression.reference, MPLGraphEdgeType.INSTANTIATED_AS, entity))
+    result.edges.add((ref, MPLGraphEdgeType.INSTANTIATED_AS, entity))
 
     return result, entity_class, value_type
 
 
 def rule_expression_to_simple_graph(
         expression: RuleExpression | TrackedValue,
-        line_number: int
-):
+        line: MPLLine
+    ) -> Tuple[SimpleGraph, MPLRule]:
+
     result = SimpleGraph()
-    line = MPLLine(line_number, expression.metadata.start, expression.metadata.source)
     result.vertices.add(line)
     rightmost_state_clause: MPLClause = None
     rule_id = get_entity_id(line)
@@ -225,8 +226,9 @@ def rule_expression_to_simple_graph(
         evaluated_in_edges = set([(v, MPLGraphEdgeType.EVALUATED_IN, this_clause) for v in refgraph.vertices])
         refgraph.edges |= evaluated_in_edges
 
-        this_operator:MPLOperator = i < len(operators) and operators[i]
+        this_operator: MPLOperator = i < len(operators) and operators[i]
         consumable_references = SimpleGraph()
+
         if isinstance(this_expression, StateExpression) and \
                 this_operator and \
                 this_operator.behavior == 'CONSUME':
@@ -236,7 +238,7 @@ def rule_expression_to_simple_graph(
         changed_in_edges = set([(v, MPLGraphEdgeType.CHANGED_IN, this_clause) for v in consumable_references.vertices])
         refgraph.edges |= changed_in_edges
 
-        if isinstance(clause.expression, StateExpression):
+        if isinstance(this_expression, StateExpression):
             rightmost_state_clause = this_clause
 
         refgraph.vertices.add(this_clause)
@@ -258,122 +260,175 @@ def rule_expression_to_simple_graph(
         result.vertices.add(clause)
         result.edges.add((clause, MPLGraphEdgeType.CHILD_OF, rule))
 
-    return result
+    return result, rule
 
 
-#TODO: This is garbage still
-class MPLGraphConversionParser(Generic[Input, Output], Parser[Input, Sequence[Output]]):
-    def __init__(self, parser: Parser[Input, Output]):
-        super().__init__()
-        self.parser = parser
+def mpl_file_lines_to_simple_graph(expresssions: SeparatedList(str | DeclarationExpression | RuleExpression | TrackedValue)):
+    out_graph = SimpleGraph()
+    open_nodes: List[Tuple[Reference, int]] = []
+    current_depth = 0
 
-    def consume(self, reader: Reader[Input]):
-        status = self.parser.consume(reader)
-        if not isinstance(status, Continue):
-            return status
+    for index, expression in enumerate(expresssions):
+        if not isinstance(expression, TrackedValue):
+            continue
+        mpl_line: MPLLine = expression_with_metadata_to_mpl_line(expression, index + 1)
+        this_line_depth = expression.metadata.start
+        parent: Reference
+        result_graph: SimpleGraph
+        result_node: Reference | MPLRule = None
 
-        output = []
-        current_depth = 0
-        current_id = 0
-        line_number = 1
-        current_node: DefinitionTreeNode = None
+        # identify parent
+        if this_line_depth > current_depth:
+            parent = open_nodes[-1][0] if len(open_nodes) else None
+        elif this_line_depth == current_depth:
+            parent = open_nodes[-2][0] if len(open_nodes) > 1 else None
+        elif this_line_depth < current_depth:
+            filtered_nodes = filter(lambda x: x[1] <= this_line_depth, open_nodes)
+            open_nodes = list(filtered_nodes)
+            parent = open_nodes[-2][0] if len(open_nodes) > 1 else None
 
-        result: TrackedValue
-        status.value: SeparatedList[str | DeclarationExpression | RuleExpression ]
+        if isinstance(expression, DeclarationExpression):
+            result_node, result_graph = get_graph_for_declaration_expression(mpl_line, expression)
+        elif isinstance(expression, RuleExpression):
+            result_graph, result_node = rule_expression_to_simple_graph(expression, mpl_line)
 
+        if parent:
+            child_edge = (result_node, MPLGraphEdgeType.CHILD_OF, parent)
+            result_graph.edges.add(child_edge)
 
-        """
-        parsing rules:
-        
-        each line increments the line number
-        
-        on empty string we continue
-        
-        at depth = 0 we add directly to the output without parent
-        
-        at depth > current we add the last observed (item, depth) to the lineage, and start adding child relationships 
-        to the last observed at current depth
-        
-        at depth < current, we drop the items in the lineage until we hit the new depth.  we then process the item as 
-        a child of the latest in the lineage
-        
-        
-        
-        on declaration expression, we have to establish a few things
-            base reference
-            qualified reference
-            
-            in the event that the parent is a state, we can assume that any declaration expression is a state, we can
-            also establish the "exclusive child" relationship
-        
-        
-        if the current lineage has a parent, the last thing wee do is establish the parent relationship
-        
-        """
+        if parent and isinstance(parent, Reference) and parent.type == 'state' and isinstance(result_node, Reference):
+            child_edge = (result_node, MPLGraphEdgeType.EXCLUSIVE_CHILD_OF, parent)
+            result_graph.edges.add(child_edge)
 
-        for result in status.value:
-            if not isinstance(result, TrackedValue):
-                continue
-            this_line_depth = result.metadata.start
+        # update lineage
+        new_node = (result_node, this_line_depth)
+        if this_line_depth > current_depth:
+            open_nodes += [new_node]
+        elif this_line_depth <= current_depth:
+            open_nodes = open_nodes[:-1] + [new_node]
 
-            if this_line_depth == 0:
-                if current_node:
-                    while current_node.parent is not None:
-                        current_node = current_node.parent
-                    output.append(current_node)
-                this_node = DefinitionTreeNode(result, None, [])
-            elif this_line_depth > current_depth:
-                this_node = DefinitionTreeNode(result, current_node, [])
-                current_node.children.append(this_node)
-            elif this_line_depth == current_depth:
-                this_node = DefinitionTreeNode(result, current_node.parent, [])
-                this_node.parent.children.append(this_node)
-            elif this_line_depth < current_depth:
-                while current_node.definition_expression.metadata.start > this_line_depth:
-                    current_node = current_node.parent
-                this_node = DefinitionTreeNode(result, current_node.parent, [])
-                this_node.parent.children.append(this_node)
-            current_node = this_node
-            current_depth = this_line_depth
+        current_depth = this_line_depth
 
-        while current_node.parent is not None:
-            current_node = current_node.parent
+        out_graph |= result_graph
 
-        output = output + [current_node]
-        status.value = tuple(output)
-        return status
+    out_graph = process_unqualified_references(out_graph)
 
-    def __repr__(self):
-        return self.name_or_nothing() + f"tree({repr(self.parser)})"
+    out_graph = process_uninstantiated_references(out_graph)
+
+    return out_graph
 
 
-def complex_expression_to_reference_graph(
-        expr: ArithmeticExpression | LogicalExpression | StateExpression | ScenarioExpression | AssignmentExpression,
-        include_negations=True
-):
-    out = SimpleGraph()
+def process_unqualified_references(graph: SimpleGraph) -> SimpleGraph:
+    reference_verts = filter_set(graph.vertices, Reference(Any, None))
+    qualification_edges = filter_set(graph.edges, (Reference, MPLGraphEdgeType.QUALIFIED_BY, Reference))
+    qualified_verts = {x[0] for x in qualification_edges}
 
-    match expr:
-        case ScenarioExpression(value):
-            return complex_expression_to_reference_graph(value)
-        case AssignmentExpression(lhs, rhs, _):
-            lhs: ReferenceExpression
-            out.vertices.add(lhs.value)
-            return out | complex_expression_to_reference_graph(rhs)
+    unqualified_verts = reference_verts ^ qualified_verts
+    unqualified_verts.discard(Reference('void', None))
 
-    for operand in expr.operands:
-        if isinstance(operand, ReferenceExpression):
-            out |= reference_to_simple_graph(operand.value)
-        elif isinstance(operand, (ArithmeticExpression, StateExpression, LogicalExpression)):
-            out |= complex_expression_to_reference_graph(operand)
-        elif isinstance(operand, TriggerExpression):
-            out |= reference_to_simple_graph(operand.name.value)
-        elif isinstance(operand, Negation):
-            tmp = operand
-            while isinstance(tmp, Negation):
-                tmp = tmp.operand
-            if isinstance(tmp, ReferenceExpression) and include_negations:
-                out |= reference_to_simple_graph(tmp.value)
-            else:
-                out |= complex_expression_to_reference_graph(operand)
-    return out
+    if not unqualified_verts:
+        return graph
+
+    evaluation_edges = filter_set(graph.edges, (unqualified_verts, MPLGraphEdgeType.EVALUATED_IN, MPLClause))
+    evaluation_clauses_dict = defaultdict(list)
+    for ee in evaluation_edges:
+        evaluation_clauses_dict[ee[0]].append(ee[2])
+
+    vert_intersection = evaluation_clauses_dict.keys() & unqualified_verts
+    if not vert_intersection:
+        names = [x.name for x in vert_intersection]
+        names_as_string = ', '.join(names)
+        raise NotImplementedError(f'could not infer types for the following refernces: {names_as_string}')
+
+    comparisons_dict: Dict[Reference, MPLValueType] = defaultdict(lambda _: MPLValueType.NONE)
+
+    #TODO: Operators should resolve to comparable flags to make this less silly
+    vert: Reference
+    for vert in unqualified_verts:
+        tmp_ref = dataclasses.replace(vert, type='any')
+        graph.vertices.add(tmp_ref)
+        graph.edges.add((vert, MPLGraphEdgeType.QUALIFIED_BY, tmp_ref))
+        evaluated_in_edges = graph.filter((vert, MPLGraphEdgeType.EVALUATED_IN, Any))
+        changed_in_edges = graph.filter((vert, MPLGraphEdgeType.CHANGED_IN, Any))
+        new_evaluation_edges = [(tmp_ref, x[1],  x[2]) for x in evaluated_in_edges | changed_in_edges]
+        graph.edges |= set(new_evaluation_edges)
+
+        #TODO: I'm going to punt on this for now, and any undefined ref is going to be 'any' (yikes)
+
+    # cleanup untyped references with edges invoking changes
+    untyped_reference_changes = graph.filter(
+        (Reference(str, None), MPLGraphEdgeType.CHANGED_IN, Any)
+    )
+
+    qualification_edges = graph.filter(
+        (Reference(str, None), MPLGraphEdgeType.QUALIFIED_BY, Reference)
+    )
+    qualification_map = dict([(x[0], x[2]) for x in qualification_edges])
+
+    for change in untyped_reference_changes:
+        new_ref = qualification_map.get(change[0])
+        if not new_ref:
+            continue
+        tmp = (new_ref, MPLGraphEdgeType.CHANGED_IN, change[2])
+        graph.edges.add(tmp)
+
+    return graph
+
+
+def get_graph_for_declaration_expression(line: MPLLine, expression: DeclarationExpression) \
+        -> Tuple[Reference, SimpleGraph]:
+
+    result, entity_class, value_type = declaration_expression_to_simple_graph(expression, line)
+    qualified_refs = filter_set(result.vertices, Reference(str, str))
+
+    return next(iter(qualified_refs)), result
+
+
+def instantiate_reference(ref:Reference) -> MPLEntity:
+    entity_class: MPLEntityClass
+    value_type: MPLValueType
+
+    match ref.type:
+        case 'state':
+            entity_class = MPLEntityClass.STATE
+            value_type = MPLValueType.ANY
+        case 'machine':
+            entity_class = MPLEntityClass.MACHINE
+            value_type = MPLValueType.ANY
+        case 'trigger':
+            entity_class = MPLEntityClass.TRIGGER
+            value_type = MPLValueType.ANY
+        case 'string':
+            entity_class = MPLEntityClass.VARIABLE
+            value_type = MPLValueType.STRING
+        case 'number':
+            entity_class = MPLEntityClass.VARIABLE
+            value_type = MPLValueType.NUMBER
+        case _:
+            entity_class = MPLEntityClass.VARIABLE
+            value_type = MPLValueType.ANY
+
+    id = get_entity_id(ref)
+    entity = MPLEntity(id, ref.name, entity_class, value_type, None)
+    return entity
+
+
+def process_uninstantiated_references(graph: SimpleGraph) -> SimpleGraph:
+    all_qualified_refs = graph.filter(Reference(str, str))
+    all_instantiated_edges = graph.filter((Reference, MPLGraphEdgeType.INSTANTIATED_AS, Any))
+    all_instantiated_refs = set([x[0] for x in all_instantiated_edges])
+    uninstantiated_refs = all_qualified_refs ^ all_instantiated_refs
+
+    for ref in uninstantiated_refs:
+        entity = instantiate_reference(ref)
+        graph.vertices.add(entity)
+        graph.edges.add((ref, MPLGraphEdgeType.INSTANTIATED_AS, entity))
+
+    return graph
+
+
+
+
+
+
+

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from typing import Optional, List, Union, Tuple
 
-from parsita import TextParsers, reg, opt, longest
+from parsita import TextParsers, reg, opt, longest, Success
 
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
     ReferenceExpressionParsers as RefExP, DeclarationExpression
@@ -55,4 +55,5 @@ def parse_machine_file(path: str) -> SeparatedList(str | DeclarationExpression |
         content = f.read()
 
     result = MachineDefinitionExpressionParsers.machine_file.parse(content)
-    return result
+    assert isinstance(result, Success)
+    return result.value

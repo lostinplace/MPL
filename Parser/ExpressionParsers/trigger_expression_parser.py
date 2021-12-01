@@ -1,3 +1,4 @@
+import dataclasses
 from dataclasses import dataclass
 from typing import Optional
 
@@ -12,16 +13,17 @@ from lib.custom_parsers import debug
 
 @dataclass(frozen=True, order=True)
 class TriggerExpression:
-    name: ReferenceExpression
+    name: Reference
     message: Optional[ReferenceExpression]
 
 
-def interpret_expression(name, message):
+def interpret_expression(name:ReferenceExpression, message):
+    name_ref = dataclasses.replace(name.value, type='trigger')
     if message:
         message = message[0]
     else:
         message = None
-    result = TriggerExpression(name, message)
+    result = TriggerExpression(name_ref, message)
     return result
 
 

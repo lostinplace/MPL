@@ -1,12 +1,13 @@
+from Parser.ExpressionParsers.reference_expression_parser import Reference
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers as parser, TriggerExpression
 from Tests import collect_parsing_expectations, qre, qdae
 
 
 def test_trigger_expression_parsers():
     expectations = {
-        "<test>": TriggerExpression(qre('test'), None),
+        "<test>": TriggerExpression(Reference('test', 'trigger'), None),
         "<Im a Complicated Event> With a Message:int": TriggerExpression(
-            qre('Im a Complicated Event'),
+            Reference('Im a Complicated Event', 'trigger'),
             qre('With a Message:int')
         ),
     }

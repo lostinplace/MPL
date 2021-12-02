@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "e62c78e4a03feff76cff5128cfaaba18c662af2b57e5724b2078d1b32eef4e6e"
+            "sha256": "4e77bb20f36eb7d60530dd527680f2a9dd24bbe0a0a64c958a1dec63de40de47"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.9"
+            "python_version": "3.10"
         },
         "sources": [
             {
@@ -16,6 +16,20 @@
         ]
     },
     "default": {
+        "networkx": {
+            "hashes": [
+                "sha256:80b6b89c77d1dfb64a4c7854981b60aeea6360ac02c6d4e4913319e0a313abef",
+                "sha256:c0946ed31d71f1b732b5aaa6da5a0388a345019af232ce2f49c766e2d6795c51"
+            ],
+            "index": "pypi",
+            "version": "==2.6.3"
+        },
+        "parsita": {
+            "git": "https://github.com/drhagen/parsita.git",
+            "ref": "4d64642712819d13c935b4f725bd6a65f6696fa8"
+        }
+    },
+    "develop": {
         "attrs": {
             "hashes": [
                 "sha256:149e90d6d8ac20db7a955ad60cf0e6881a3f20d37096140088356da6c716b0b1",
@@ -86,19 +100,11 @@
         },
         "packaging": {
             "hashes": [
-                "sha256:096d689d78ca690e4cd8a89568ba06d07ca097e3306a4381635073ca91479966",
-                "sha256:14317396d1e8cdb122989b916fa2c7e9ca8e2be9e8060a6eff75b6b7b4d8a7e0"
+                "sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb",
+                "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"
             ],
             "markers": "python_version >= '3.6'",
-            "version": "==21.2"
-        },
-        "parsita": {
-            "hashes": [
-                "sha256:6c957ef9ede79da9c9fbde31910f2384826a310b25872db28cfeb7334737e88b",
-                "sha256:6dae2b02cb172f41811419ef9600e6f81bc90378a82526595b94d8770dc92955"
-            ],
-            "index": "pypi",
-            "version": "==1.6.1"
+            "version": "==21.3"
         },
         "pluggy": {
             "hashes": [
@@ -118,11 +124,11 @@
         },
         "pyparsing": {
             "hashes": [
-                "sha256:c203ec8783bf771a155b207279b9bccb8dea02d8f0c9e5f8ead507bc3246ecc1",
-                "sha256:ef9d7589ef3c200abe66653d3f1ab1033c3c419ae9b9bdb1240a85b024efc88b"
+                "sha256:04ff808a5b90911829c55c4e26f75fa5ca8a2f5f36aa3a51f68e27033341d3e4",
+                "sha256:d9bdec0013ef1eb5a84ab39a3b3868911598afa494f5faa038647101504e2b81"
             ],
-            "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3'",
-            "version": "==2.4.7"
+            "markers": "python_version >= '3.6'",
+            "version": "==3.0.6"
         },
         "pytest": {
             "hashes": [
@@ -140,6 +146,5 @@
             "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==0.10.2"
         }
-    },
-    "develop": {}
+    }
 }

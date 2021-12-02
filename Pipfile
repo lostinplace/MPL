@@ -4,11 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-parsita = "==1.6.1"
+networkx = "*"
+parsita = {git = "https://github.com/drhagen/parsita.git"}
+
+[dev-packages]
 pytest = "*"
 coverage = "*"
 
-[dev-packages]
-
 [requires]
-python_version = "3.9"
+python_version = "3.10"

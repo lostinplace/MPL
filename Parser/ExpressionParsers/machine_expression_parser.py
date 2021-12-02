@@ -4,30 +4,15 @@ from dataclasses import dataclass
 
 from typing import Optional, List, Union, Tuple
 
-from parsita import TextParsers, reg, opt, longest
+from parsita import TextParsers, reg, opt, longest, Success
 
 from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
     ReferenceExpressionParsers as RefExP, DeclarationExpression
 from Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers as RuleExP
 
-from lib.additive_parsers import track
+from lib.additive_parsers import track, TrackedValue
 from lib.custom_parsers import check
-from lib.tree_parser import tree, DefinitionTreeNode
-from lib.repsep2 import repsep2
-
-
-@dataclass(frozen=True, order=True)
-class StateDefinitionExpression:
-    name: str
-    rules: List[DeclarationExpression | RuleExpression]
-
-
-@dataclass(frozen=True, order=True)
-class MachineDefinitionExpression:
-    name: str
-    rules: List[
-        RuleExpression | DeclarationExpression | 'MachineDefinitionExpression'
-    ]
+from lib.repsep2 import repsep2, SeparatedList
 
 
 def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]:
@@ -53,13 +38,6 @@ def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]
     return ref_name, ref_type
 
 
-def compact_tree(a_tree: DefinitionTreeNode):
-    def_expression: RuleExpression = a_tree.definition_expression
-    definition = get_definition(def_expression)
-    if definition == 'state':
-        pass
-
-
 class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
     ignored_whitespace = reg(r"[ \t]*")
     iw = ignored_whitespace
@@ -69,5 +47,13 @@ class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
     empty_line = iw & check('\n')
     valid_line = longest(empty_line, declaration_line, rule_line)
     rule_lines = repsep2(valid_line, '\n', reset=True, min=1)
-    machine_file = tree(rule_lines)
+    machine_file = rule_lines
 
+
+def parse_machine_file(path: str) -> SeparatedList(str | DeclarationExpression | RuleExpression | TrackedValue):
+    with open(path) as f:
+        content = f.read()
+
+    result = MachineDefinitionExpressionParsers.machine_file.parse(content)
+    assert isinstance(result, Success)
+    return result.value

@@ -1,12 +1,18 @@
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression, AssignmentExpressionParsers
 from Parser.Tokenizers.operator_tokenizers import AssignmentOperator
+from Parser.Tokenizers.simple_value_tokenizer import StringToken
 
 from Tests import qdae, qre, collect_parsing_expectations, quick_parse
 
 
 def test_assignment_expression_parsers():
     expectations = {
+        'noise = `safe`': AssignmentExpression(
+            qre('noise'),
+            quick_parse(StringToken, '`safe`'),
+            AssignmentOperator('=')
+        ),
         "help:Me /= 1+(2-3)*4": AssignmentExpression(
             qre('help:Me'),
             quick_parse(ArithmeticExpression, '1+(2-3)*4'),

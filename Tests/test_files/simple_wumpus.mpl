@@ -6,8 +6,8 @@ Wumpus: machine
 
     * ~> Ok
 
-    Hurt ~@ Turns Wounded += 1
-    Ok ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
+    Hurt & <Turn Ended> ~@ Turns Wounded += 1
+    Ok & <Turn Ended> ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
 
     <Stab> ~> Ok -> Hurt
     <Stab> ~> Hurt -> Dead

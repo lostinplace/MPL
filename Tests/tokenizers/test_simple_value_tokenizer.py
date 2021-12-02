@@ -30,7 +30,7 @@ def test_simple_value_tokenization():
         "a": ReferenceToken('a'),
         "Test Mee": ReferenceToken("Test Mee"),
         "Im a simple reference": ReferenceToken("Im a simple reference"),
-        "Im a broken 12 reference": Failure,
+        "Im a broken 12 reference": ReferenceToken("Im a broken 12 reference"),
         "a + b": Failure,
         "-10.556ds": Failure,
         "21313.2121": NumberToken("21313.2121"),

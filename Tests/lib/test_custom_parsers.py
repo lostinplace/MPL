@@ -6,7 +6,7 @@ from parsita.state import Input, Output, StringReader, Continue
 
 from Tests import collect_parsing_expectations
 from lib.custom_parsers import excluding, check, debug, back
-from lib.additive_parsers import track, tag, TaggedValue, TrackedValue
+from lib.additive_parsers import track, TrackedValue, TrackingMetadata
 from lib.repsep2 import repsep2, SeparatedList
 
 
@@ -34,25 +34,58 @@ def test_track_parser():
     assert isinstance(result, Success)
 
     result_value: TrackedValue = result.value
+
     assert result_value == '678'
-    assert result_value.metadata.start == 5
 
-    track('test')
+    expected_metadata = TrackingMetadata(
+        5,
+        "'678' << '90'",
+        '67890',
+        None
+    )
+
+    assert result_value.metadata == expected_metadata
 
 
-def test_tag_parser():
-    head_parser = lit('head ')
-    body_parser = lit('body')
-    tail_parser = lit(' tail')
-    content = 'head body tail'
-    tagged_body_parser = tag(body_parser, 'TESTING')
+def test_track_parser_with_simple_tag():
+    integer = reg(r'[-+]?[0-9]+') > int
+    parser = 'it is ' >> track(integer, tag='fahrenheit') << ' degrees outside'
 
-    test_parser = head_parser >> tagged_body_parser << tail_parser
-    result = test_parser.parse(content)
+    content = 'it is -32 degrees outside'
 
+    result = parser.parse(content)
     assert isinstance(result, Success)
-    result_value: TaggedValue = result.value
-    assert result_value.tag == 'TESTING'
+    result_value: TrackedValue = result.value
+    assert result_value == -32
+
+    expected_metadata = TrackingMetadata(
+        6,
+        r"reg(r'[-+]?[0-9]+')",
+        '-32',
+        'fahrenheit'
+    )
+
+    assert result_value.metadata == expected_metadata
+
+
+def test_track_parser_with_callback_tag():
+    parser = lit('this is $') >> track(reg(r'\d+'), lambda _: int(_))
+
+    content = 'this is $150'
+
+    result = parser.parse(content)
+    assert isinstance(result, Success)
+    result_value: TrackedValue = result.value
+    assert result_value == '150'
+
+    expected_metadata = TrackingMetadata(
+        9,
+        r"reg(r'\d+')",
+        '150',
+        150
+    )
+
+    assert result_value.metadata == expected_metadata
 
 
 def assert_parsing_expectations(expectations: Dict[str, Any], parser):
@@ -98,13 +131,13 @@ def test_repsep2_parser_reset():
             test4
     test5""".strip('\n')
 
-    expected = [
+    expected = (
         ('test1', 4),
         ('test2', 8),
         ('test3', 12),
         ('test4', 12),
         ('test5', 4),
-    ]
+    )
 
     def processor(result):
         return result, result.metadata.start

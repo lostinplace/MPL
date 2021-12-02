@@ -10,32 +10,32 @@ def test_logical_expression_parsers():
 
     expectations = {
         "a && !b": LogicalExpression(
-            [
+            (
                 qre('a'),
                 Negation(qre('b'))
-            ],
-            [LogicalOperator('&&')]
+            ),
+            (LogicalOperator('&&'),)
         ),
         "a && !(brett + 7 != 4) || d": LogicalExpression(
-            [
+            (
                 qre('a'),
                 Negation(
                     LogicalExpression(
-                        [qdae('brett + 7'), qdae('4')],
-                        [LogicalOperator("!=")]
+                        (qdae('brett + 7'), qdae('4')),
+                        (LogicalOperator("!="),)
                     )
                 ),
                 qre('d'),
-            ],
-            [LogicalOperator("&&"), LogicalOperator("||")]
+            ),
+            (LogicalOperator("&&"), LogicalOperator("||"))
         ),
         "A == 1": LogicalExpression(
-            [qre("A"), qdae("1")],
-            [LogicalOperator('==')]
+            (qre("A"), qdae("1")),
+            (LogicalOperator('=='),)
         ),
         "A && B != C || D": LogicalExpression(
-            [qre("A"), qre("B"), qre("C"), qre("D")],
-            [LogicalOperator('&&'), LogicalOperator('!='), LogicalOperator('||')]
+            (qre("A"), qre("B"), qre("C"), qre("D")),
+            (LogicalOperator('&&'), LogicalOperator('!='), LogicalOperator('||'))
         ),
     }
 

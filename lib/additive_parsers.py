@@ -1,5 +1,5 @@
 from dataclasses import dataclass, is_dataclass
-from typing import Any, Generic, Dict, TypeVar, Union, Type, Tuple
+from typing import Any, Generic, Dict, TypeVar, Union, Type, Tuple, Callable
 
 from parsita import Parser, Reader, lit
 from parsita.state import Status, Input, Output, Continue
@@ -40,7 +40,8 @@ tracked_subclass_cache = dict()
 class TrackingMetadata:
     start: int
     parser_name: str
-    status: Status[Input, Output]
+    source: str
+    tag: Any
 
 
 class TrackedValue:
@@ -48,19 +49,36 @@ class TrackedValue:
 
 
 class TrackParser(Generic[Input, Output], Parser[Input, Input]):
-    def __init__(self, parser: Parser[Input, Output]):
+    tag: Any
+
+    def __init__(self, parser: Parser[Input, Output], tag: Callable[[Any], Any] = None):
         super().__init__()
         self.parser = parser
+        self.tag = tag
+
 
     def consume(self, reader: Reader[Input]):
         status = self.parser.consume(reader)
 
         if isinstance(status, Continue):
+            if isinstance(self.tag, Callable):
+                tag_value: Any = self.tag(status.value)
+            else:
+                tag_value = self.tag
+
+
+            if status.remainder.finished:
+                final_position = None
+            else:
+                final_position = status.remainder.position
+
             metadata = TrackingMetadata(
                 reader.position,
                 repr(self.parser),
-                status
+                reader.source[reader.position:final_position],
+                tag_value,
             )
+
             result = generate_subclass_with_attributes(
                 status.value,
                 'Tracked',
@@ -75,7 +93,7 @@ class TrackParser(Generic[Input, Output], Parser[Input, Input]):
         return self.name_or_nothing() + 'track({})'.format(repr(self.parser))
 
 
-def track(parser: Parser[Input, Output]) -> ExcludingParser:
+def track(parser: Parser[Input, Output], tag:Any=None) -> ExcludingParser:
     """Tracks metadata about the result of the provided parser
 
     Args:
@@ -83,41 +101,4 @@ def track(parser: Parser[Input, Output]) -> ExcludingParser:
     """
     if isinstance(parser, str):
         parser = lit(parser)
-    return TrackParser(parser)
-
-
-tagged_subclass_cache = dict()
-
-@dataclass
-class TaggedValue:
-    tag: Any
-
-
-class TagParser(Generic[Input, Output], Parser[Input, Input]):
-    def __init__(self, parser: Parser[Input, Output], tag:Any):
-        super().__init__()
-        self.parser = parser
-        self.tag = tag
-
-    def consume(self, reader: Reader[Input]):
-        status = self.parser.consume(reader)
-        if not isinstance(status, Continue):
-            return status
-        result_value = status.value
-        result_value = generate_subclass_with_attributes(
-            result_value,
-            'Tagged',
-            TaggedValue,
-            {'tag': self.tag}
-        )
-        status.value = result_value
-        return status
-
-    def __repr__(self):
-        return self.name_or_nothing() + 'label({})'.format(repr(self.parser))
-
-
-def tag(parser: Parser[Input, Output], label:str) -> ExcludingParser:
-    if isinstance(parser, str):
-        parser = lit(parser)
-    return TagParser(parser, label)
+    return TrackParser(parser, tag)

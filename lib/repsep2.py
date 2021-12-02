@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Generic, Sequence, Optional, Union, List, Any
+from typing import Generic, Sequence, Optional, Union, List, Any, Tuple
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.state import Input, Output, Continue, Backtrack
@@ -81,12 +81,12 @@ class RepeatedSeparatedParser2(Generic[Input, Output], Parser[Input, Sequence[Ou
             status = last_success
             separators = separators[:-1]
 
-        output_list = SeparatedList(output)
-        output_list.separators = separators
-
         if self.repetition_minimum > len(output):
             message = f"at least {self.repetition_minimum} for {self.__repr__()}"
             return Backtrack(reader, lambda: message)
+
+        output_list = SeparatedList(output)
+        output_list.separators = tuple(separators)
 
         if self.reset:
             reader.position = absolute_position
@@ -127,5 +127,21 @@ def repsep2(
     return RepeatedSeparatedParser2(parser, separator, min, max, reset)
 
 
-class SeparatedList(list):
-    separators: List[Any] = None
+# def recurse_hash_list(a_list):
+#     out = []
+#     for i in a_list:
+#         if isinstance(i, Iterable):
+#             out.append( recurse_hash_list(i) )
+#         else:
+#             out.append(hash(i))
+#     return tuple(out)
+
+
+class SeparatedList(tuple):
+    separators: Tuple[Any] = None
+
+    # def __hash__(self):
+    #     hashed_values = recurse_hash_list(self.__iter__())
+    #     hashed_separators = recurse_hash_list(self.separators)
+    #     tmp = (hashed_values, hashed_separators)
+    #     return hash(tmp)

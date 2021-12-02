@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Union, List
+from typing import Union, List, Tuple
 
 from parsita import TextParsers, fwd, opt, lit, longest
 
@@ -19,8 +21,8 @@ class StateOperation:
 
 @dataclass(frozen=True, order=True)
 class StateExpression:
-    operands: List[Union[ReferenceExpression, 'StateExpression', Negation]]
-    operators: List[StateOperator]
+    operands: Tuple[ReferenceExpression | 'StateExpression' | Negation]
+    operators: Tuple[StateOperator]
 
 
 def interpret_negated_expression(parser_result):
@@ -29,19 +31,21 @@ def interpret_negated_expression(parser_result):
 
 
 def interpret_state_expression(parser_results: SeparatedList):
-    operands = parser_results
     if len(parser_results) == 1 and isinstance(parser_results[0], StateExpression):
         return parser_results[0]
+
+    operands = tuple(parser_results.__iter__())
     operators = parser_results.separators
+
     result = StateExpression(operands, operators)
     return result
 
 
-def interpret_void_state_expression(result):
-    return StateExpression([
-            ReferenceExpression(Reference('void', None), [])
-        ],
-        []
+def interpret_void_state_expression(_):
+    re = ReferenceExpression(Reference('void', None), ())
+    return StateExpression(
+        (re,),
+        ()
     )
 
 

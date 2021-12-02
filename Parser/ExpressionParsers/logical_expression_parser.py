@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Tuple
 
 from parsita import TextParsers, fwd, longest
 
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, ReferenceExpressionParsers as lep
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as aep, \
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
+    ReferenceExpressionParsers as RefExP
+from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as ArExP, \
     ArithmeticExpression
 from Parser.Tokenizers.operator_tokenizers import LogicalOperatorParsers as lop, LogicalOperator
 from lib.repsep2 import repsep2, SeparatedList
@@ -17,10 +20,10 @@ class Negation:
 
 @dataclass(frozen=True, order=True)
 class LogicalExpression:
-    operands: List[
-        Union[ReferenceExpression, ArithmeticExpression, 'LogicalExpression', Negation]
+    operands: Tuple[
+        ReferenceExpression | ArithmeticExpression | 'LogicalExpression' | Negation
     ]
-    operators: List[
+    operators: Tuple[
         LogicalOperator
     ]
 
@@ -32,7 +35,7 @@ def interpret_negated_expression(parser_result):
 
 
 def interpret_simple_expression(parser_results: SeparatedList):
-    operands = parser_results
+    operands = tuple(parser_results.__iter__())
     operators = parser_results.separators
 
     result = LogicalExpression(operands, operators)
@@ -47,8 +50,8 @@ class LogicalExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     logical_expression_operand = longest(
         parenthesized_simple_expression, \
         negated_expression, \
-        lep.expression, \
-        aep.expression
+        RefExP.expression, \
+        ArExP.expression
     )
 
     negated_expression.define(

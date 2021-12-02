@@ -1,17 +1,19 @@
 from dataclasses import replace, dataclass
-from typing import Any, Dict, Iterator
+from typing import Any, Dict, Iterator, Generic, TypeVar
 
 from parsita import Failure, Success
 
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
 from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
 from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
+    DeclarationExpression
+from Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
 from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken
+from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers, StringToken
 
 
 @dataclass(frozen=True, order=True)
@@ -90,11 +92,17 @@ parser_map ={
     ArithmeticExpression: ArithmeticExpressionParsers.expression,
     LogicalExpression: LogicalExpressionParsers.expression,
     TriggerExpression: TriggerExpressionParsers.expression,
-    ScenarioExpression: ScenarioExpressionParsers.expression
+    ScenarioExpression: ScenarioExpressionParsers.expression,
+    RuleExpression: RuleExpressionParsers.expression,
+    DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
+    StringToken: SimpleValueTokenizers.string_token,
 }
 
 
-def quick_parse(out_type: type, value: str):
+T = TypeVar('T')
+
+
+def quick_parse(out_type: Generic[T], value: str) -> T:
     parser = parser_map[out_type]
     result = parser.parse(value)
     return result.value

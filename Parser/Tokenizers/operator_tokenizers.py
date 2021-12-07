@@ -110,6 +110,7 @@ class ArithmeticOperatorParsers(TextParsers, whitespace=None):
     arith_subtract = lit('-') > ArithmeticOperator
     arith_multiply = lit('*') > ArithmeticOperator
     arith_divide = lit('/') > ArithmeticOperator
+    # TODO: replace ^ with **, preserving xor
     arith_exponent = lit('^') > ArithmeticOperator
     arith_modulus = lit('%') > ArithmeticOperator
 

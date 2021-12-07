@@ -101,6 +101,7 @@ class MPLEntity:
 
 
 def get_entity_id(line: MPLLine, *args) -> int:
+    # TODO: rework entity ids, the resolver system should be unaware of them until the end
     other = '-SALT_COMBINE-'.join(map(repr, args))
     input = repr(line) + other
     return hash(input)

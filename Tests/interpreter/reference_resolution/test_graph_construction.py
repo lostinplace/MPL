@@ -148,6 +148,7 @@ def test_rule_graph_construction_with_trigger():
             expected_line_entry,
             Reference('Ok', None),
             Reference('Turns Wounded', None),
+            Reference('Turn Ended', None),
             Reference('Turn Ended', 'trigger'),
             expected_clause_1,
             expected_clause_2,
@@ -160,6 +161,8 @@ def test_rule_graph_construction_with_trigger():
             (Reference('Turns Wounded', None), et.EVALUATED_IN, expected_clause_3),
             (Reference('Turns Wounded', None), et.CHANGED_IN, expected_clause_3),
             (Reference('Turn Ended', 'trigger'), et.EVALUATED_IN, expected_clause_1),
+            (Reference(name='Turn Ended', type=None), et.EVALUATED_IN, expected_clause_1),
+            (Reference(name='Turn Ended', type=None), et.QUALIFIED_BY, Reference('Turn Ended', 'trigger')),
             (expected_clause_1, et.CHILD_OF, expected_rule),
             (expected_clause_2, et.CHILD_OF, expected_rule),
             (expected_clause_3, et.CHILD_OF, expected_rule),
@@ -253,10 +256,17 @@ def test_complex_expression_to_reference_graph():
         ),
         quick_parse(StateExpression, '<Notice me> & Senpai'): SimpleGraph(
             {
+                Reference(name='Notice me', type=None),
                 Reference(name='Notice me', type='trigger'),
                 Reference(name='Senpai', type=None),
             },
-            set()
+            edges={
+                (
+                    Reference(name='Notice me', type=None),
+                    MPLGraphEdgeType.QUALIFIED_BY,
+                    Reference(name='Notice me', type='trigger')
+                )
+            }
 
         ),
     }

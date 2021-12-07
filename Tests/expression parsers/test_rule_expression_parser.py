@@ -4,7 +4,7 @@ from Parser.ExpressionParsers.rule_expression_parser import RuleExpression, Rule
 from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
 from Parser.ExpressionParsers.state_expression_parser import StateExpression
 from Parser.Tokenizers.operator_tokenizers import MPLOperator
-from Tests import qre, collect_parsing_expectations, qse, quick_parse
+from Tests import collect_parsing_expectations, qse, quick_parse
 
 
 def test_rule_expression_parsers():

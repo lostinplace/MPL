@@ -126,7 +126,6 @@ def is_scalar_vector(vector: 'MPLVector') -> bool:
     return vector.terms.get(tks)
 
 
-
 def to_mpl_vector(item: Union[Number, str, Reference, TK, 'MPLVector']) -> 'MPLVector':
     match item:
         case MPLVector(_):
@@ -147,6 +146,11 @@ def to_mpl_vector(item: Union[Number, str, Reference, TK, 'MPLVector']) -> 'MPLV
             })
 
     raise NotImplementedError(f'could not get vector for type {type(item)}')
+
+
+def prune_zero_terms(vector: 'MPLVector') -> 'MPLVector':
+    filtered_terms = filter(lambda x: x[1], vector.terms.items())
+    return MPLVector(dict(filtered_terms))
 
 
 def to_tk(item: Union[Number, str, Reference] ) -> TK:
@@ -219,14 +223,16 @@ class MPLVector:
                     new_value = old_value + other.terms[key]
                     out[key] = new_value
                 tmp = self.terms | out
-                return MPLVector(tmp)
+                result = MPLVector(tmp)
+                return prune_zero_terms(result)
         out = {
             other_key: new_value
         }
-        result = self.terms | out
-        return MPLVector(result)
+        result = MPLVector(self.terms | out)
+        return prune_zero_terms(result)
 
     def __mul__(self, other: Union[Number, str, 'MPLVector', TK, Reference]) -> 'MPLVector':
+        result = None
         match other:
             case 0 | 0.0:
                 return MPLVector({})
@@ -236,14 +242,16 @@ class MPLVector:
                 out = dict()
                 for k in self.terms:
                     out[k] = self.terms[k] * other
-                return MPLVector(out)
+                result =  MPLVector(out)
             case str(_) | Reference(_, _):
                 tmp = to_mpl_vector(other)
-                return mpl_vector_times_mpl_vector(tmp, self)
+                result =  mpl_vector_times_mpl_vector(tmp, self)
             case TK(_, _):
-                return to_mpl_vector(other) * self
+                result =  to_mpl_vector(other) * self
             case MPLVector(_):
-                return mpl_vector_times_mpl_vector(self, other)
+                result = mpl_vector_times_mpl_vector(self, other)
+        if result is not None:
+            return prune_zero_terms(result)
         raise NotImplementedError(f"multiplication between MPL Vector and type {type(other)} is not supported")
 
     def __pow__(self, power):
@@ -251,18 +259,21 @@ class MPLVector:
             component_vectors = split_vector(self)
             cache = [x ** power for x in component_vectors]
             out = reduce(lambda x, y: x + y, cache)
-            return out
+            return prune_zero_terms(out)
+        result = None
         match power:
             case 0 | 0.0:
                 return to_mpl_vector(1)
             case 1 | 1.0:
                 return self
             case int(_) | float(_):
-                return single_term_vector_up_number(self, power)
+                result = single_term_vector_up_number(self, power)
             case str(_) | Reference(_, _):
-                return single_term_vector_up_string_or_ref(self, power)
+                result = single_term_vector_up_string_or_ref(self, power)
             case MPLVector(_):
-                return single_term_vector_up_vector(self, power)
+                result = single_term_vector_up_vector(self, power)
+        if result is not None:
+            return prune_zero_terms(result)
         raise NotImplementedError(f"multiplication between MPL Vector and type {type(power)} is not supported")
 
 

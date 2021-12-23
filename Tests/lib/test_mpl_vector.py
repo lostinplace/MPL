@@ -1,7 +1,8 @@
 from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from Parser.ExpressionParsers.reference_expression_parser import Reference
 from Tests import quick_parse
-from lib.mpl_vector import MPLVector, fs, TK, qv, to_vector, vector_to_string, tk_set_times_tk_set, to_mpl_vector
+from lib.mpl_vector import MPLVector, fs, TK, qv, to_vector, vector_to_string, tk_set_times_tk_set, to_mpl_vector, \
+    eval_mpl_vector
 
 
 def test_mpl_vector_from_arithmetic_expression():
@@ -278,3 +279,22 @@ def test_tk_multiplication():
     }
     for actual in expectations:
         assert actual == expectations[actual]
+
+
+def test_mpl_vector_simplification():
+    ref_cache = {
+        Reference('test', None): 12
+    }
+
+    expectations = {
+        qv('144 * 32'):  144 * 32,
+        qv('144 - test ^ 2'): 0,
+        qv('5*x') - qv('5*x'): 0
+    }
+
+    for e in expectations:
+        expected = expectations[e]
+        actual = eval_mpl_vector(e, ref_cache)
+        assert actual == expected
+
+

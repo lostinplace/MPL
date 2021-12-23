@@ -28,7 +28,7 @@ def to(target_type):
 @dataclass(frozen=True, order=True)
 class Reference:
     name: str
-    type: Optional[str]
+    type: Optional[str] = None
 
 
 @dataclass(frozen=True, order=True)

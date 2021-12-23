@@ -101,10 +101,7 @@ def is_operation_suitable(operation, x, y):
     return flag
 
 
-t = Union
-
 def eval_postfix(postfix_queue: List[Number | Reference | str], ref_cache: Dict[Reference, Number | str | MPLEntity]):
-    # TODO: Holdover from Arithmetic expression interpreter
     index = 0
     while index < len(postfix_queue):
         item = postfix_queue[index]
@@ -136,7 +133,7 @@ def evaluate_expression(expression: LogicalExpression, reference_cache: Dict[Ref
     return result
 
 
-def test_postfix():
+def test_expression_evaluation():
 
     cache = {
         Reference('test', None): 7,
@@ -156,7 +153,7 @@ def test_postfix():
         assert actual == expected
 
 
-def test_postfix_evaluation():
+def test_postfix_conversion():
     expectations = {
         '4+3*8^2/32+4^3/4-7': [
             4, 3, 8, 2, '^', '*', 32, '/', '+', 4, 3, '^', 4, '/', '+', 7, '-'

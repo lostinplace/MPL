@@ -81,7 +81,11 @@ def eval_postfix(postfix_queue: List[Number | Reference | str], ref_cache: Dict[
     while index < len(postfix_queue):
         item = postfix_queue[index]
         if isinstance(item, Reference):
-            value = ref_cache[item]
+            value = ref_cache.get(item)
+            match value:
+                case x if isinstance(x, MPLEntity):
+                    value = x.value
+
             if not isinstance(value, Number):
                 message = f"Arithmetic expressions only support numeric values at this time, " \
                           f"the value of {repr(item)} was {repr(value)}"

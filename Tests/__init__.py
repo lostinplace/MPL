@@ -12,9 +12,7 @@ from Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParser
 from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
-from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
 from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers, StringToken
-from lib.mpl_vector import MPLVector, MPLVectorParsers
 
 
 @dataclass(frozen=True, order=True)
@@ -97,7 +95,6 @@ parser_map ={
     RuleExpression: RuleExpressionParsers.expression,
     DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
     StringToken: SimpleValueTokenizers.string_token,
-    MPLVector: MPLVectorParsers.vector,
 }
 
 

@@ -10,8 +10,9 @@ from mpl.interpreter.expression_evaluation.query_expression_interpreter import p
 from mpl.interpreter.expression_evaluation import QueryExpressionInterpreter, create_interpreter, op_dict, \
     AssignmentExpressionInterpreter
 from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass, MPLEntity
+from mpl.lib import fs
 from mpl.lib.logic import eval_expr_with_context
-from mpl.lib.mpl_vector import fs
+
 
 
 def opr(x):

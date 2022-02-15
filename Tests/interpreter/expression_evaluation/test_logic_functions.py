@@ -1,7 +1,8 @@
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
 from sympy import abc, N, symbols
-from mpl.lib.mpl_vector import fs
+
+from mpl.lib import fs
 from mpl.lib.logic import logic_and, logic_negate, logic_or, logic_xor, eval_expr_with_context, logic_gt, logic_lt, \
     logic_ge, logic_le, logic_eq, logic_neq
 

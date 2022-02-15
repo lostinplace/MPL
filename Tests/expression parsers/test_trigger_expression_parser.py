@@ -1,6 +1,6 @@
-from Parser.ExpressionParsers.reference_expression_parser import Reference
-from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers as parser, TriggerExpression
-from Tests import collect_parsing_expectations, qre, qdae
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
+from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers as parser, TriggerExpression
+from Tests import collect_parsing_expectations, qre
 
 
 def test_trigger_expression_parsers():

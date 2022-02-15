@@ -1,9 +1,9 @@
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
-from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression, AssignmentExpressionParsers
-from Parser.Tokenizers.operator_tokenizers import AssignmentOperator
-from Parser.Tokenizers.simple_value_tokenizer import StringToken
+from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
+from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression, AssignmentExpressionParsers
+from mpl.Parser.Tokenizers.operator_tokenizers import AssignmentOperator
+from mpl.Parser.Tokenizers.simple_value_tokenizer import StringToken
 
-from Tests import qdae, qre, collect_parsing_expectations, quick_parse
+from Tests import qre, collect_parsing_expectations, quick_parse
 
 
 def test_assignment_expression_parsers():

@@ -1,13 +1,13 @@
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers, ArithmeticExpression
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
-from Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken
-from Tests import qdae, collect_parsing_expectations, qre
+from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers, ArithmeticExpression
+from mpl.Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
+
+from mpl.Parser.Tokenizers.simple_value_tokenizer import NumberToken
+from Tests import collect_parsing_expectations, qre
 
 
 def test_simple_expression_parsers():
     expectations = {
-        "2^((-1+6)/4)*7/-9/3": ArithmeticExpression(
+        "2**((-1+6)/4)*7/-9/3": ArithmeticExpression(
             (
                 NumberToken("2"),
                 ArithmeticExpression(
@@ -25,13 +25,13 @@ def test_simple_expression_parsers():
                 NumberToken("3"),
             ),
             (
-                ArithmeticOperator("^"),
+                ArithmeticOperator("**"),
                 ArithmeticOperator("*"),
                 ArithmeticOperator("/"),
                 ArithmeticOperator("/"),
             )
         ),
-        "(2-3)*4+-5.0^(6.12-0.7)": ArithmeticExpression(
+        "(2-3)*4+-5.0**(6.12-0.7)": ArithmeticExpression(
             (
                 ArithmeticExpression(
                     (NumberToken("2"), NumberToken("3")),
@@ -47,7 +47,7 @@ def test_simple_expression_parsers():
             (
                 ArithmeticOperator("*"),
                 ArithmeticOperator("+"),
-                ArithmeticOperator("^"),
+                ArithmeticOperator("**"),
             )
         ),
         "0": ArithmeticExpression((NumberToken("0"),), ()),
@@ -57,7 +57,7 @@ def test_simple_expression_parsers():
             (NumberToken("1"), NumberToken("2")),
             (ArithmeticOperator("+"),),
         ),
-        "12.0/-13^14.15--16": ArithmeticExpression(
+        "12.0/-13**14.15--16": ArithmeticExpression(
             (
                 NumberToken("12.0"),
                 NumberToken("-13"),
@@ -66,7 +66,7 @@ def test_simple_expression_parsers():
             ),
             (
                 ArithmeticOperator("/"),
-                ArithmeticOperator("^"),
+                ArithmeticOperator("**"),
                 ArithmeticOperator("-"),
             )
         ),

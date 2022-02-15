@@ -1,9 +1,9 @@
-from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
-from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression
-from Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers, RuleClause
-from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
-from Parser.ExpressionParsers.state_expression_parser import StateExpression
-from Parser.Tokenizers.operator_tokenizers import MPLOperator
+from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers, RuleClause
+from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
+from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpression
+from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from Tests import collect_parsing_expectations, qse, quick_parse
 
 
@@ -51,7 +51,7 @@ def test_rule_expression_parsers():
         ),
         'Distance To Prey > Smell Range -> Smell Prey -> *': RuleExpression(
             (
-                RuleClause('query', quick_parse(LogicalExpression, 'Distance To Prey > Smell Range')),
+                RuleClause('query', quick_parse(QueryExpression, 'Distance To Prey > Smell Range')),
                 RuleClause('state', qse('Smell Prey')),
                 RuleClause('state', qse('*')),
             ),
@@ -74,7 +74,7 @@ def test_rule_expression_parsers():
         'Ok ~> Turns Wounded > 0 ~@ Turns Wounded -= 1': RuleExpression(
             (
                 RuleClause('state', qse('Ok')),
-                RuleClause('query', quick_parse(LogicalExpression, 'Turns Wounded > 0')),
+                RuleClause('query', quick_parse(QueryExpression, 'Turns Wounded > 0')),
                 RuleClause('action', quick_parse(AssignmentExpression, 'Turns Wounded -= 1')),
             ),
             (MPLOperator('ANY', 'OBSERVE', 'STATE', 3), MPLOperator('ANY', 'OBSERVE', 'ACTION', 24))

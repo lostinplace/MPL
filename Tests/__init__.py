@@ -1,18 +1,18 @@
-from dataclasses import replace, dataclass
+from dataclasses import dataclass
 from typing import Any, Dict, Iterator, Generic, TypeVar
 
 from parsita import Failure, Success
 
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
-from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
-from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression, LogicalExpressionParsers
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
+from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
+from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
     DeclarationExpression
-from Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
-from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
-from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
-from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
-from Parser.Tokenizers.simple_value_tokenizer import NumberToken, SimpleValueTokenizers, StringToken
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
+from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
+from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
+from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
+from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, StringToken
 
 
 @dataclass(frozen=True, order=True)
@@ -89,7 +89,7 @@ parser_map ={
     StateExpression: StateExpressionParsers.expression,
     ReferenceExpression: ReferenceExpressionParsers.expression,
     ArithmeticExpression: ArithmeticExpressionParsers.expression,
-    LogicalExpression: LogicalExpressionParsers.expression,
+    QueryExpression: QueryExpressionParsers.expression,
     TriggerExpression: TriggerExpressionParsers.expression,
     ScenarioExpression: ScenarioExpressionParsers.expression,
     RuleExpression: RuleExpressionParsers.expression,

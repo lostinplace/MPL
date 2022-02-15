@@ -1,3 +1,97 @@
+## State Transistion Expression
+
+### AND
+
+` a & b -> c `
+
+> if a ≠ ∅ ∧ b ≠ ∅, then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c , a=∅, b=∅
+
+### OR
+
+`a | b -> c | d`
+
+> if a ∪ b ≠ ∅, then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c, δ ⊆ d, a=∅, b=∅
+
+### XOR
+
+`a ^ b -> c ^ d`
+
+if a ⊻ b ≠ ∅, then δ ≝ a ∪ b
+
+after the rule is executed: δ ⊆ c ⊻ d, a=∅, b=∅
+
+### NOT
+
+#### Example 1
+
+```mpl
+* -@ x = y + 2
+* -@ a = 0
+
+!a & x -> c
+
+```
+
+given δ ≝ {¬a, x} ≣ { ⊨ , y+2 } ≣ { y+2 }
+
+after the rule is executed
+
+δ ⊆ c, a ≣ ∅, x ≣ ∅
+
+#### Example 2
+
+```mpl
+* -@ x = y + 2
+* -@ a = 1
+
+!a | x -> c
+
+```
+
+given δ ≝ {¬a, x} ≣ { ⊭ , y+2 } ≣ { y+2 }
+
+after the rule is executed
+
+δ ⊆ c, a ≣ 1, x ≣ ∅
+
+#### Example 3
+
+```mpl
+* -@ x = y + 2
+* -@ a = 1
+
+a | x -> c & !d
+
+```
+
+given d ≣ ∅, δ ≝ {a, x} ≣ {1, y+2 }
+
+after the rule is executed
+
+δ ⊆ c, a ≣ ∅, x ≣ ∅, d ≣ ∅
+
+the moment you usee thee entity in an expression, it becomes a logical value, not an entity reference
+
+
+
+### Arithmetic expression
+
+```mpl
+* -@ x = 1
+* -@ a = y + 1
+
+x - 1 | a -> c
+
+```
+
+given δ ≝ {x-1, y+1} ≣ {1-1, y+1}  ≣ { y + 1 }
+
+after the rule is executed
+
+δ ⊆ c, a = ∅, x = 1
+
+
+---
 ## Arithmetic Expressions
 
 ### Example
@@ -9,7 +103,7 @@
 ### Definition
 
 ```python
-def evaluate_expression(expression: ArithmeticExpression, reference_cache: Dict[Reference, Number | str | MPLEntity]) -> Number:
+def evaluate_expression(expression: 'ArithmeticExpression', reference_cache: 'Dict'['Reference', 'Number' | str | 'MPLEntity']) -> 'Number':
     ...
 ```
 
@@ -26,7 +120,7 @@ The result  of any ArithmeticExpression is a Number
 ### Definition
 
 ```python
-def evaluate_expression(expression: ScenarioExpression, reference_cache: Dict[Reference, Number | str | MPLEntity]) -> ScenarioDescriptor:
+def evaluate_expression(expression: 'ScenarioExpression', reference_cache: 'Dict'['Reference', 'Number' | str | 'MPLEntity']) -> 'ScenarioDescriptor':
     ...
 ```
 
@@ -67,3 +161,67 @@ a -> %{4} ~> 10 -> d
 
 
 Note that the state of the observation collapses when provided with more information, in this case the result of the arithmetic operation `10`.
+
+
+## Assignment expressions
+
+### Increment
+
+the `+=` operation will add the RHS to the LHS, and yield back nothing 
+
+### Decrement
+
+the `-=` operation will subtract the RHS from the LHS, and yield back what was removed
+
+## Logical Expressions
+
+### Truth
+
+a state is true when it possesses a non-zero vector
+
+### Expression Results
+
+Logical expression results have 3 components, As Source, As Target, and Value
+
+```
+Result:
+    Operation: AND | OR | XOR | EQ | NEQ | GT | GTE | LT | LTE
+    As Source: Set[Reference | Set[Reference]]
+    As Target: Set[Reference | Set[Reference]]
+    Value: str | Number | Vector
+```
+
+### Negation
+when an entity is negated using the `!` operator, logical operations will only return truth for that operator when it is not active (meaning it has been assigned a non-zero vector)
+
+
+### AND
+
+```
+A: state
+    AA
+    AB
+
+B: state
+
+A & B === Result(source:{}, target:{A,B})
+
+A = 1
+B = 2*x
+
+A & B === Result(source:{A:1, B:2*x}, target:{A,B})
+
+A & !B === Result(source:{}, target:{A})
+
+A & !B -> C
+C -> A & !B
+
+the value of AND === if both entities are active, the sum of those entities
+
+A & B & C -> D
+
+A + B + C + D
+```
+
+
+

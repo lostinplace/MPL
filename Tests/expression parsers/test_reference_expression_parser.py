@@ -1,6 +1,5 @@
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
     Reference
-from Parser.Tokenizers.simple_value_tokenizer import ReferenceToken
 from Tests import collect_parsing_expectations
 
 

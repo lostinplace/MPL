@@ -1,8 +1,8 @@
-from Parser.ExpressionParsers.logical_expression_parser import Negation
-from Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
-from Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateOperation, StateExpression
-from Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
-from Parser.Tokenizers.operator_tokenizers import StateOperator
+from mpl.Parser.ExpressionParsers.query_expression_parser import Negation
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
+from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
+from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
+from mpl.Parser.Tokenizers.operator_tokenizers import StateOperator
 from Tests import collect_parsing_expectations, qre, quick_parse
 
 

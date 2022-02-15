@@ -1,13 +1,13 @@
 from typing import Dict, Any
 
-from parsita import Success, lit, Failure, opt, Parser, TextParsers, reg, rep, repsep
+from parsita import Success, lit, Failure, Parser, TextParsers, reg, repsep
 from parsita.parsers import RegexParser
-from parsita.state import Input, Output, StringReader, Continue
+from parsita.state import Input, Output
 
 from Tests import collect_parsing_expectations
-from lib.custom_parsers import excluding, check, debug, back
-from lib.additive_parsers import track, TrackedValue, TrackingMetadata
-from lib.repsep2 import repsep2, SeparatedList
+from mpl.lib.parsers.custom_parsers import excluding, check, debug, back
+from mpl.lib.parsers.additive_parsers import track, TrackedValue, TrackingMetadata
+from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
 
 
 def test_exclude_parser():

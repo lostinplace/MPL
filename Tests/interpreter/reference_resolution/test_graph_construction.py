@@ -1,20 +1,20 @@
-from typing import Tuple, List
+from typing import Tuple
 
-from Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
-from Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
-from Parser.ExpressionParsers.logical_expression_parser import LogicalExpression
-from Parser.ExpressionParsers.machine_expression_parser import parse_machine_file
-from Parser.ExpressionParsers.reference_expression_parser import Reference, DeclarationExpression, ReferenceExpression
-from Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
-from Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
+from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
+from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
+from mpl.Parser.ExpressionParsers.machine_expression_parser import parse_machine_file
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, DeclarationExpression, ReferenceExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
+from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
 
-from Parser.ExpressionParsers.state_expression_parser import StateExpression
-from Parser.Tokenizers.operator_tokenizers import MPLOperator
+from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpression
+from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from Tests import quick_parse
 
-from lib.simple_graph import SimpleGraph
-from interpreter.reference_resolution.reference_graph_resolution import MPLLine, MPLEntity, get_entity_id, \
-    declaration_expression_to_simple_graph, MPLValueType, MPLEntityClass, MPLClause, MPLRule, \
+from mpl.lib.simple_graph import SimpleGraph
+from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLLine, MPLEntity, get_entity_id, \
+    declaration_expression_to_simple_graph, MPLEntityClass, MPLClause, MPLRule, \
     rule_expression_to_simple_graph, complex_expression_to_reference_graph, MPLGraphEdgeType, \
     mpl_file_lines_to_simple_graph, reference_to_simple_graph, expression_with_metadata_to_mpl_line
 
@@ -28,14 +28,14 @@ def test_id_generator():
 
 
 def test_declaration_graph_construction():
-    from interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass as ec, MPLValueType as vt, MPLGraphEdgeType as et
+    from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass as ec, MPLGraphEdgeType as et
 
     result = parse_machine_file('Tests/test_files/simple_machine_declaration_file.mpl')
 
     first_line = result[0]
     expected_line_entry = MPLLine(1, 0, 'base: machine')
     expected_machine_id = get_entity_id(expected_line_entry)
-    expected_entity = MPLEntity(expected_machine_id, 'base', ec.MACHINE, vt.ANY, None)
+    expected_entity = MPLEntity(expected_machine_id, 'base', ec.MACHINE, None)
 
     expected = SimpleGraph(
         verts={
@@ -53,15 +53,14 @@ def test_declaration_graph_construction():
         }
     )
 
-    actual, _, __ = declaration_expression_to_simple_graph(first_line, MPLLine(1, 0, 'base: machine'))
+    actual, _ = declaration_expression_to_simple_graph(first_line, MPLLine(1, 0, 'base: machine'))
 
     assert actual == expected
     assert _ == MPLEntityClass.MACHINE
-    assert __ == MPLValueType.ANY
 
 
 def test_rule_graph_construction():
-    from interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
+    from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
 
     expected_line_entry = MPLLine(14, 4, 'base state 2 -> test variable > 10 ->  complex state layer 2a')
 
@@ -69,7 +68,7 @@ def test_rule_graph_construction():
     expected_clause_1 = MPLClause(expected_clause_id, quick_parse(StateExpression, 'base state 2'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 1)
-    expected_clause_2 = MPLClause(expected_clause_id, quick_parse(LogicalExpression, 'test variable > 10'))
+    expected_clause_2 = MPLClause(expected_clause_id, quick_parse(QueryExpression, 'test variable > 10'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 2)
     expected_clause_3 = MPLClause(expected_clause_id, quick_parse(StateExpression, 'complex state layer 2a'))
@@ -124,7 +123,7 @@ def get_comparable_simplegraphs(actual:SimpleGraph, expected:SimpleGraph) -> Tup
 
 
 def test_rule_graph_construction_with_trigger():
-    from interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
+    from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
 
     expected_line_entry = MPLLine(10, 4, 'Ok & <Turn Ended> ~> Turns Wounded > 0 ~@ Turns Wounded -= 1')
 
@@ -132,7 +131,7 @@ def test_rule_graph_construction_with_trigger():
     expected_clause_1 = MPLClause(expected_clause_id, quick_parse(StateExpression, 'Ok & <Turn Ended>'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 1)
-    expected_clause_2 = MPLClause(expected_clause_id, quick_parse(LogicalExpression, 'Turns Wounded > 0'))
+    expected_clause_2 = MPLClause(expected_clause_id, quick_parse(QueryExpression, 'Turns Wounded > 0'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 2)
     expected_clause_3 = MPLClause(expected_clause_id, quick_parse(AssignmentExpression, 'Turns Wounded -= 1'))
@@ -181,7 +180,7 @@ def test_rule_graph_construction_with_trigger():
 
 
 def test_rule_graph_construction_with_scenario_and_void():
-    from interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
+    from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLGraphEdgeType as et
 
     expected_line_entry = MPLLine(36, 8, 'Hurt ~> Feel Secure -> %{Turns Wounded} -> *')
 
@@ -281,7 +280,7 @@ def test_rule_graph_construction_doesnt_fail_on_simple_wumpus_lines():
     source = parse_machine_file('Tests/test_files/simple_wumpus.mpl')
     for i, line in enumerate(source):
         if isinstance(line, DeclarationExpression):
-            actual, _, __ = declaration_expression_to_simple_graph(line, i+1)
+            actual, _= declaration_expression_to_simple_graph(line, i+1)
         elif isinstance(line, RuleExpression):
             actual = rule_expression_to_simple_graph(line, i+1)
 
@@ -398,28 +397,28 @@ def test_graph_generation_assorted_edge_checks():
             (
                 Reference('Wumpus', 'machine'),
                 MPLGraphEdgeType.INSTANTIATED_AS,
-                MPLEntity(Any, 'Wumpus', MPLEntityClass.MACHINE, Any, Any)
+                MPLEntity(Any, 'Wumpus', MPLEntityClass.MACHINE, Any)
             ), 1
         ),
         (
             (
                 Reference('Wander', 'state'),
                 MPLGraphEdgeType.INSTANTIATED_AS,
-                MPLEntity(Any, 'Wander', MPLEntityClass.STATE, Any, Any)
+                MPLEntity(Any, 'Wander', MPLEntityClass.STATE, Any)
             ), 1
         ),
         (
             (
                 Reference('noise', 'any'),
                 MPLGraphEdgeType.INSTANTIATED_AS,
-                MPLEntity(Any, 'noise', MPLEntityClass.VARIABLE, Any, Any)
+                MPLEntity(Any, 'noise', MPLEntityClass.VARIABLE, Any)
             ), 1
         ),
         (
             (
                 Reference('Snarl', 'trigger'),
                 MPLGraphEdgeType.INSTANTIATED_AS,
-                MPLEntity(Any, 'Snarl', MPLEntityClass.TRIGGER, Any, Any)
+                MPLEntity(Any, 'Snarl', MPLEntityClass.TRIGGER, Any)
             ), 1
         ),
     ]

@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from parsita import Success, Failure
 
-from Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, StringToken, ReferenceToken
+from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, NumberToken, StringToken, ReferenceToken
 from Tests import collect_parsing_expectations
 
 

@@ -1,6 +1,6 @@
 from parsita import Success
 
-from Parser.ExpressionParsers.machine_expression_parser import MachineDefinitionExpressionParsers as MDExP
+from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineDefinitionExpressionParsers as MDExP
 
 
 def test_tree_parser():

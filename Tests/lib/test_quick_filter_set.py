@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Tuple
 
-from lib.quick_filter_set import filter_set
+from mpl.lib.quick_filter_set import filter_set
 
 
 @dataclass(frozen=True, order=True)

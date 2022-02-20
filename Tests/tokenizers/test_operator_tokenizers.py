@@ -1,8 +1,8 @@
 from typing import Dict, Any
 
-from parsita import Success, Failure, lit, reg
+from parsita import Success, Failure, reg
 
-from Parser.Tokenizers.operator_tokenizers import MPLOperatorParsers, MPLOperator, StateOperator, StateOperatorParsers
+from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperatorParsers, MPLOperator, StateOperator, StateOperatorParsers
 from Tests import collect_parsing_expectations
 
 

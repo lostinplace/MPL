@@ -7,11 +7,12 @@ from parsita import TextParsers, fwd, longest, lit
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
     ReferenceExpressionParsers as RefExP, Reference
+from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpressionParsers as TexExP, TextExpression
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as ArExP, \
     ArithmeticExpression
-from mpl.Parser.Tokenizers.operator_tokenizers import QueryOperatorParsers as lop, QueryOperator
+from mpl.Parser.Tokenizers.operator_tokenizers import QueryOperatorParsers as lop, QueryOperator, ArithmeticOperator
 from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
-from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers as texp
+from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers as TrgExP
 
 
 @dataclass(frozen=True, order=True)
@@ -22,10 +23,10 @@ class Negation:
 @dataclass(frozen=True, order=True)
 class QueryExpression:
     operands: Tuple[
-        ReferenceExpression | ArithmeticExpression | 'QueryExpression' | Negation
-        ]
+        ReferenceExpression | ArithmeticExpression | 'QueryExpression' | Negation | TextExpression, ...
+    ]
     operators: Tuple[
-        QueryOperator
+        QueryOperator | ArithmeticOperator, ...
     ]
 
 
@@ -61,7 +62,8 @@ class QueryExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
         negated_expression,
         RefExP.expression,
         ArExP.expression,
-        texp.expression,
+        TrgExP.expression,
+        TexExP.expression,
     )
 
     negation = lop.logical_negation >> logical_expression_operand > Negation

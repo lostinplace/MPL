@@ -11,7 +11,8 @@ from typing import Tuple, List, Any, FrozenSet, Union, Optional
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, Negation
-from mpl.Parser.ExpressionParsers.reference_expression_parser import DeclarationExpression, Reference, ReferenceExpression
+from mpl.Parser.ExpressionParsers.reference_expression_parser import DeclarationExpression, Reference, \
+    ReferenceExpression
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
 from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpression
@@ -46,21 +47,22 @@ class MPLLine:
 @dataclass(frozen=True, order=True)
 class MPLRule:
     id: int
-    clauses: Tuple[MPLClause]
-    operators: Tuple[MPLOperator]
+    clauses: Tuple[MPLClause, ...]
+    operators: Tuple[MPLOperator, ...]
 
 
 @dataclass(frozen=True, order=True)
 class MPLClause:
     id: int
-    expression: StateExpression | QueryExpression | AssignmentExpression | ArithmeticExpression
+    expression: QueryExpression | AssignmentExpression | ScenarioExpression
 
 
-class MPLEntityClass(Enum):
-    MACHINE = 0
-    STATE = 1
-    VARIABLE = 2
-    TRIGGER = 3
+class MPLEntityClass(enum.Flag):
+    MACHINE = enum.auto()
+    STATE = enum.auto()
+    VARIABLE = enum.auto()
+    TRIGGER = enum.auto()
+    CLEARED_BY_CONSUMPTION = MACHINE | STATE | TRIGGER
     
 
 class MPLGraphEdgeType(enum.Flag):
@@ -220,7 +222,7 @@ def rule_expression_to_simple_graph(
         this_operator: MPLOperator = i < len(operators) and operators[i]
         consumable_references = SimpleGraph()
 
-        if isinstance(this_expression, StateExpression) and \
+        if isinstance(this_expression, QueryExpression) and \
                 this_operator and \
                 this_operator.behavior == 'CONSUME':
             consumable_references = complex_expression_to_reference_graph(clause.expression, include_negations=False)
@@ -229,7 +231,7 @@ def rule_expression_to_simple_graph(
         changed_in_edges = set([(v, MPLGraphEdgeType.CHANGED_IN, this_clause) for v in consumable_references.vertices])
         refgraph.edges |= changed_in_edges
 
-        if isinstance(this_expression, StateExpression):
+        if isinstance(this_expression, QueryExpression):
             rightmost_state_clause = this_clause
 
         refgraph.vertices.add(this_clause)

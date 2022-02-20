@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Callable, Any
 
-from mpl.lib.logic import logic_negate, logic_xor, logic_and, logic_or
+from mpl.lib.query_logic import query_negate, query_xor, query_and, query_or
 
 
 class OperationType(Enum):
@@ -22,29 +22,29 @@ class OperatorOperation:
 
 
 operations = [
-    OperatorOperation('!', 9, OperationType.Unary, logic_negate), #done
-    OperatorOperation('**', 8, OperationType.NumericAlgebra, lambda x, y: x ** y), #done
-    OperatorOperation('*', 7, OperationType.NumericAlgebra, lambda x, y: x * y), #done
-    OperatorOperation('/', 7, OperationType.NumericAlgebra, lambda x, y: x / y), #done
-    OperatorOperation('+', 6, OperationType.NumericAlgebra, lambda x, y: x + y), #done
-    OperatorOperation('-', 6, OperationType.NumericAlgebra, lambda x, y: x - y), #done
+    OperatorOperation('!', 9, OperationType.Unary, query_negate),
+    OperatorOperation('**', 8, OperationType.NumericAlgebra, lambda x, y: x ** y),
+    OperatorOperation('*', 7, OperationType.NumericAlgebra, lambda x, y: x * y),
+    OperatorOperation('/', 7, OperationType.NumericAlgebra, lambda x, y: x / y),
+    OperatorOperation('+', 6, OperationType.NumericAlgebra, lambda x, y: x + y),
+    OperatorOperation('-', 6, OperationType.NumericAlgebra, lambda x, y: x - y),
     OperatorOperation('==', 5, OperationType.Logical, lambda x, y: x == y),
     OperatorOperation('!=', 5, OperationType.Logical, lambda x, y: x != y),
     OperatorOperation('>', 5, OperationType.Logical, lambda x, y: x > y),
     OperatorOperation('>=', 5, OperationType.Logical, lambda x, y: x >= y),
     OperatorOperation('<', 5, OperationType.Logical, lambda x, y: x < y),
     OperatorOperation('<=', 5, OperationType.Logical, lambda x, y: x <= y),
-    OperatorOperation('^', 4, OperationType.Logical, logic_xor), #done
-    OperatorOperation('&', 3, OperationType.Logical, logic_and), #done
-    OperatorOperation('|', 2, OperationType.Logical, logic_or), #done
-
-    OperatorOperation('=',  0, OperationType.Assign   , lambda x, y: x),  # done
-    OperatorOperation('+=', 1, OperationType.Increment, lambda x, y: x + y),  # done
-    OperatorOperation('-=', 1, OperationType.Increment, lambda x, y: x - y),  # done
-    OperatorOperation('*=', 1, OperationType.Increment, lambda x, y: x * y),  # done
-    OperatorOperation('/=', 1, OperationType.Increment, lambda x, y: x / y),  # done
-    OperatorOperation('&=', 1, OperationType.Increment, lambda x, y: logic_and),  # done
-    OperatorOperation('|=', 1, OperationType.Increment, lambda x, y: logic_or),  # done
-    OperatorOperation('^=', 1, OperationType.Increment, lambda x, y: logic_xor),  # done
+    OperatorOperation('^', 4, OperationType.Logical, query_xor),
+    OperatorOperation('&', 3, OperationType.Logical, query_and),
+    OperatorOperation('|', 2, OperationType.Logical, query_or),
+    OperatorOperation('+=', 1, OperationType.Increment, lambda x, y: x + y),
+    OperatorOperation('-=', 1, OperationType.Increment, lambda x, y: x - y),
+    OperatorOperation('*=', 1, OperationType.Increment, lambda x, y: x * y),
+    OperatorOperation('/=', 1, OperationType.Increment, lambda x, y: x / y),
+    OperatorOperation('&=', 1, OperationType.Increment, lambda x, y: query_and),
+    OperatorOperation('|=', 1, OperationType.Increment, lambda x, y: query_or),
+    OperatorOperation('^=', 1, OperationType.Increment, lambda x, y: query_xor),
+    OperatorOperation('=',  0, OperationType.Assign   , lambda x, y: x),
 ]
-op_dict = dict([(x.sign, x) for x in operations])
+
+query_operations_dict = dict([(x.sign, x) for x in operations])

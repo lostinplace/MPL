@@ -11,30 +11,30 @@ def test_rule_expression_parsers():
     expectations = {
         '!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure': RuleExpression(
             (
-                RuleClause('state', quick_parse(StateExpression, '!Smell Prey & Flee')),
+                RuleClause('query', quick_parse(QueryExpression, '!Smell Prey & Flee')),
                 RuleClause('action', quick_parse(AssignmentExpression, 'noise = `safe`')),
-                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, 'Feel Secure')),
             ),
             (MPLOperator('ANY', 'OBSERVE', 'ACTION', 19), MPLOperator('ANY', 'OBSERVE', 'STATE', 37))
         ),
         'Smell Prey & !Feel Secure ~> Wander -> Flee': RuleExpression(
             (
-                RuleClause('state', quick_parse(StateExpression, 'Smell Prey & !Feel Secure')),
-                RuleClause('state', quick_parse(StateExpression, 'Wander')),
-                RuleClause('state', quick_parse(StateExpression, 'Flee')),
+                RuleClause('query', quick_parse(QueryExpression, 'Smell Prey & !Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, 'Wander')),
+                RuleClause('query', quick_parse(QueryExpression, 'Flee')),
             ),
             (MPLOperator('ANY', 'OBSERVE', 'STATE', 26), MPLOperator('ANY', 'CONSUME', 'STATE', 36))
         ),
         ' * & Ok ~> Feel Secure': RuleExpression(
             (
-                RuleClause('state', quick_parse(StateExpression, '* & Ok')),
-                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, '* & Ok')),
+                RuleClause('query', quick_parse(QueryExpression, 'Feel Secure')),
             ),
             (MPLOperator('ANY', 'OBSERVE', 'STATE', 8),)
         ),
         'Hurt ~@ Turns Wounded: int += 1': RuleExpression(
             (
-                RuleClause('state', qse('Hurt')),
+                RuleClause('query', quick_parse(QueryExpression, 'Hurt')),
                 RuleClause(
                     'action',
                     quick_parse(AssignmentExpression, 'Turns Wounded: int += 1')
@@ -45,15 +45,15 @@ def test_rule_expression_parsers():
         '%{10} -> Feel Secure': RuleExpression(
             (
                 RuleClause('scenario', quick_parse(ScenarioExpression, '%{10}')),
-                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, 'Feel Secure')),
             ),
             (MPLOperator('ANY', 'CONSUME', 'STATE', 6),)
         ),
         'Distance To Prey > Smell Range -> Smell Prey -> *': RuleExpression(
             (
                 RuleClause('query', quick_parse(QueryExpression, 'Distance To Prey > Smell Range')),
-                RuleClause('state', qse('Smell Prey')),
-                RuleClause('state', qse('*')),
+                RuleClause('query', quick_parse(QueryExpression, 'Smell Prey')),
+                RuleClause('query', quick_parse(QueryExpression, '*')),
             ),
             (
                 MPLOperator('ANY', 'CONSUME', 'STATE', 31),
@@ -62,9 +62,9 @@ def test_rule_expression_parsers():
         ),
         '<Exit Strike Zone> ~> Near Prey -> <Free>': RuleExpression(
             (
-                RuleClause('state', qse('<Exit Strike Zone>')),
-                RuleClause('state', qse('Near Prey')),
-                RuleClause('state', qse('<Free>')),
+                RuleClause('query', quick_parse(QueryExpression, '<Exit Strike Zone>')),
+                RuleClause('query', quick_parse(QueryExpression, 'Near Prey')),
+                RuleClause('query', quick_parse(QueryExpression, '<Free>')),
             ),
             (
                 MPLOperator('ANY', 'OBSERVE', 'STATE', 19),
@@ -73,7 +73,7 @@ def test_rule_expression_parsers():
         ),
         'Ok ~> Turns Wounded > 0 ~@ Turns Wounded -= 1': RuleExpression(
             (
-                RuleClause('state', qse('Ok')),
+                RuleClause('query', quick_parse(QueryExpression, 'Ok')),
                 RuleClause('query', quick_parse(QueryExpression, 'Turns Wounded > 0')),
                 RuleClause('action', quick_parse(AssignmentExpression, 'Turns Wounded -= 1')),
             ),
@@ -81,10 +81,10 @@ def test_rule_expression_parsers():
         ),
         'Hurt: Health ~> Feel Secure -> %{10} -> Feel Secure': RuleExpression(
             (
-                RuleClause('state', quick_parse(StateExpression, 'Hurt: Health')),
-                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, 'Hurt: Health')),
+                RuleClause('query', quick_parse(QueryExpression, 'Feel Secure')),
                 RuleClause('scenario', quick_parse(ScenarioExpression, '%{10}')),
-                RuleClause('state', quick_parse(StateExpression, 'Feel Secure')),
+                RuleClause('query', quick_parse(QueryExpression, 'Feel Secure')),
             ),
             (
                 MPLOperator('ANY', 'OBSERVE', 'STATE', 13),
@@ -94,22 +94,22 @@ def test_rule_expression_parsers():
         ),
         '<Stab> ~> Ok -> Hurt': RuleExpression(
             (
-                RuleClause('state', qse('<Stab>')),
-                RuleClause('state', qse('Ok')),
-                RuleClause('state', qse('Hurt')),
+                RuleClause('query', quick_parse(QueryExpression, '<Stab>')),
+                RuleClause('query', quick_parse(QueryExpression, 'Ok')),
+                RuleClause('query', quick_parse(QueryExpression, 'Hurt')),
             ),
             (MPLOperator('ANY', 'OBSERVE', 'STATE', 7), MPLOperator('ANY', 'CONSUME', 'STATE', 13)),
         ),
         "a -> <b>": RuleExpression(
             (
-                RuleClause('state', qse('a')),
-                RuleClause('state', quick_parse(StateExpression, '<b>')),
+                RuleClause('query', quick_parse(QueryExpression, 'a')),
+                RuleClause('query', quick_parse(QueryExpression, '<b>')),
             ),
             (MPLOperator('ANY', 'CONSUME', 'STATE', 2),)
         ),
 
     }
 
-    for result in collect_parsing_expectations(expectations, RuleExpressionParsers.expression ):
+    for result in collect_parsing_expectations(expectations, RuleExpressionParsers.expression):
         result = result.as_strings()
-        assert result.actual.replace('Tracked', '') == result.expected
+        assert result.actual.replace('Tracked', '') == result.expected, result.parser_input

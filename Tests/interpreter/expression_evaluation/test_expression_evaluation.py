@@ -5,18 +5,20 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
+from mpl.interpreter.expression_evaluation.assignmment_expression_interpreter import AssignmentResult
 from mpl.interpreter.expression_evaluation.query_expression_interpreter import postfix, symbolize_postfix, \
-    evaluate_symbolized_postfix_stack, symbolize_expression
-from mpl.interpreter.expression_evaluation import QueryExpressionInterpreter, create_interpreter, op_dict, \
+    evaluate_symbolized_postfix_stack, symbolize_expression, QueryResult
+from mpl.interpreter.expression_evaluation import QueryExpressionInterpreter, create_expression_interpreter, query_operations_dict, \
     AssignmentExpressionInterpreter
+from mpl.interpreter.expression_evaluation.scenario_expression_interpreter import ScenarioResult
 from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass, MPLEntity
 from mpl.lib import fs
-from mpl.lib.logic import eval_expr_with_context
+from mpl.lib.query_logic import eval_expr_with_context
 
 
 
 def opr(x):
-    return op_dict[x]
+    return query_operations_dict[x]
 
 
 def test_postfix():
@@ -36,7 +38,7 @@ def test_postfix():
 
     for input, expected in expectations.items():
         expr = quick_parse(QueryExpression, input)
-        actual = postfix(expr)
+        actual = postfix(expr, operation_dict=query_operations_dict)
         assert actual == expected
 
 
@@ -53,7 +55,7 @@ def test_postfix_symbolization():
 
     for input, expected in expectations.items():
         expr = quick_parse(QueryExpression, input)
-        tmp = postfix(expr)
+        tmp = postfix(expr, query_operations_dict)
         actual = symbolize_postfix(tmp)
         assert actual == expected
 
@@ -119,10 +121,10 @@ def test_query_expression_chain_evaluation():
         expr = quick_parse(QueryExpression, input)
         symbolized = symbolize_expression(expr)
         actual = evaluate_symbolized_postfix_stack(symbolized, context)
-        assert actual == expected
+        assert actual == expected, input
 
 
-def test_query_expression_interpreter():
+def test_query_expression_interpreter_complex():
     context = {
         Reference('test', None): 7,
         Reference('test two', None): 196,
@@ -130,44 +132,25 @@ def test_query_expression_interpreter():
         Reference('Hurt'): MPLEntity(2, 'Hurt', MPLEntityClass.STATE, fs(1)),
         Reference('Turn Ended'): MPLEntity(3, 'Turn Ended', MPLEntityClass.TRIGGER, fs(1)),
         Reference('Turn Started'): MPLEntity(4, 'Turn Ended', MPLEntityClass.TRIGGER, fs()),
+        Reference('void'): MPLEntity(5, '*', MPLEntityClass.STATE, fs(1)),
     }
 
-    statement = 'bank & (bank - (5*black))'
-
-    expr = quick_parse(QueryExpression, statement)
-    symbolized = symbolize_expression(expr)
-    actual = create_interpreter(expr)
-    assert actual.symbolized == symbolized
-    result = actual.evaluate(context)
-    expected_result = {Ref("{}"): (fs(context[Ref('bank')], Ref('red') * 3),)}
-    assert result == expected_result
-
-
-def test_assignment_expression_interpreter_simple():
-    context = {
-        Reference('test', None): 7,
-        Reference('test two', None): 196,
-        Reference('bank'): MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): MPLEntity(2, 'Hurt', MPLEntityClass.STATE, fs(1)),
-        Reference('Turn Ended'): MPLEntity(3, 'Turn Ended', MPLEntityClass.TRIGGER, fs(1)),
-        Reference('Turn Started'): MPLEntity(4, 'Turn Ended', MPLEntityClass.TRIGGER, fs()),
+    expectations = {
+        '*': QueryResult(
+            fs(MPLEntity(5, '*', MPLEntityClass.STATE, fs(1))),
+        ),
+        'bank & (bank - (5*black))': QueryResult(
+            fs(context[Ref('bank')], Ref('red') * 3)
+        )
     }
 
-    statement = 'bank = (bank - (5*black))'
-
-    expr = quick_parse(AssignmentExpression, statement)
-    symbolized = symbolize_expression(expr.rhs)
-    expected_interpreter = AssignmentExpressionInterpreter(expr, Ref('bank'), op_dict['='], symbolized)
-    actual_interpreter = create_interpreter(expr)
-
-    assert expected_interpreter == actual_interpreter
-
-
-    expected_entity = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red')))
-    expected_result = {Ref('bank'): expected_entity}
-
-    actual_result = actual_interpreter.evaluate(context)
-    assert expected_result == actual_result
+    for input, expected in expectations.items():
+        expr = quick_parse(QueryExpression, input)
+        symbolized = symbolize_expression(expr)
+        actual = create_expression_interpreter(expr)
+        assert actual.symbolized == symbolized
+        result = actual.interpret(context)
+        assert result == expected
 
 
 def test_assignment_expression_interpreter():
@@ -179,9 +162,13 @@ def test_assignment_expression_interpreter():
         Reference('Hurt'): MPLEntity(2, 'Hurt', MPLEntityClass.STATE, fs(1)),
         Reference('Turn Ended'): MPLEntity(3, 'Turn Ended', MPLEntityClass.TRIGGER, fs(1)),
         Reference('Turn Started'): MPLEntity(4, 'Turn Ended', MPLEntityClass.TRIGGER, fs()),
+        Reference('noise'): MPLEntity(4, 'noise', MPLEntityClass.STATE, fs()),
     }
 
     expectations = {
+        'noise = `safe`': {
+            Reference('noise'): MPLEntity(4, 'noise', MPLEntityClass.STATE, fs('safe')),
+        },
         'test three *= 7': {
             Reference('test three'): fs(35)
         },
@@ -205,9 +192,9 @@ def test_assignment_expression_interpreter():
     for input, expected in expectations.items():
         expr = quick_parse(AssignmentExpression, input)
 
-        interpreter = create_interpreter(expr)
-        actual = interpreter.evaluate(context)
-        assert actual == expected
+        interpreter = create_expression_interpreter(expr)
+        actual = interpreter.interpret(context)
+        assert actual == AssignmentResult(expected)
 
 
 def test_scenario_expression_interpreter():
@@ -221,20 +208,14 @@ def test_scenario_expression_interpreter():
         Reference('Turn Started'): MPLEntity(4, 'Turn Ended', MPLEntityClass.TRIGGER, fs()),
     }
 
-    scenario_ref = Reference('%')
-
     expectations = {
-        '%{3}': {
-            scenario_ref: (fs(3),),
-        },
-        '%{bank - bank}': {
-            scenario_ref: (fs(),),
-        },
+        '%{3}': ScenarioResult(fs(3)),
+        '%{bank - bank}': ScenarioResult(fs()),
     }
 
     for input, expected in expectations.items():
         expr = quick_parse(ScenarioExpression, input)
 
-        interpreter = create_interpreter(expr)
-        actual = interpreter.evaluate(context)
+        interpreter = create_expression_interpreter(expr)
+        actual = interpreter.interpret(context)
         assert actual == expected

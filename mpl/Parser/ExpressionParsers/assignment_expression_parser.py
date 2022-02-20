@@ -8,7 +8,7 @@ from parsita import TextParsers, longest
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser \
     import ArithmeticExpression, ArithmeticExpressionParsers as ArExP
 from mpl.Parser.ExpressionParsers.query_expression_parser \
-    import QueryExpression, QueryExpressionParsers as LoExP
+    import QueryExpression, QueryExpressionParsers as QExP
 from mpl.Parser.ExpressionParsers.reference_expression_parser \
     import ReferenceExpression, ReferenceExpressionParsers as RefExP
 from mpl.Parser.Tokenizers.operator_tokenizers import AssignmentOperator, AssignmentOperatorParsers as AsOpP
@@ -37,5 +37,5 @@ def interpret_to(default_dataclass, keys: typing.List[str]):
 
 class AssignmentExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 
-    expression = RefExP.expression & AsOpP.operator & longest(svt.string_token, ArExP.expression, LoExP.expression) > \
+    expression = RefExP.expression & AsOpP.operator & QExP.expression > \
                  interpret_to(default_assignment_expression, ['lhs', 'operator', 'rhs'])

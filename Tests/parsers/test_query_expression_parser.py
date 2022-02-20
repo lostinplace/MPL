@@ -5,8 +5,10 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
     QueryExpressionParsers
 
 from Tests import collect_parsing_expectations, qre, qdae, quick_parse
+from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from mpl.Parser.Tokenizers.operator_tokenizers import QueryOperator, ArithmeticOperator
+from mpl.Parser.Tokenizers.simple_value_tokenizer import StringToken
 
 
 def qne(arg: Any):
@@ -16,9 +18,21 @@ def qne(arg: Any):
     )
 
 
-def test_logical_expression_parsers():
+def test_query_expression_parser():
 
     expectations = {
+        "!test": qne(qre('test')),
+        "`safe`": QueryExpression(
+            (
+                TextExpression(
+                    (
+                        StringToken("safe"),
+                    ),
+                    ()
+                ),
+            ),
+            ()
+        ),
         "first & !(second ^ third) - 4 * 5 | sixth": QueryExpression(
             (
                 qre('first'),
@@ -65,13 +79,6 @@ def test_logical_expression_parsers():
                 QueryOperator('&'),
             )
         ),
-        "!test": QueryExpression(
-            (
-                qne(qre('test')),
-            ),
-            (
-            )
-        ),
 
         "keep calm & !<kill> the messenger | be uninformed": QueryExpression(
             (
@@ -112,13 +119,6 @@ def test_logical_expression_parsers():
             (
                 QueryOperator('&'),
             )
-        ),
-
-        "!test": QueryExpression(
-            (
-                qre('test'),
-            ),
-            (QueryOperator('!'),)
         ),
         "4+3": QueryExpression(
             (
@@ -163,6 +163,10 @@ def test_logical_expression_parsers():
         "A & B != C | D": QueryExpression(
             (qre("A"), qre("B"), qre("C"), qre("D")),
             (QueryOperator('&'), QueryOperator('!='), QueryOperator('|'))
+        ),
+        'Hurt & <Turn Ended>': QueryExpression(
+            (qre('Hurt'), quick_parse(TriggerExpression, '<Turn Ended>')),
+            (QueryOperator('&'),)
         ),
     }
 

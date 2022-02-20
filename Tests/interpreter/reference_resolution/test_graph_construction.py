@@ -65,13 +65,13 @@ def test_rule_graph_construction():
     expected_line_entry = MPLLine(14, 4, 'base state 2 -> test variable > 10 ->  complex state layer 2a')
 
     expected_clause_id = get_entity_id(expected_line_entry, 0)
-    expected_clause_1 = MPLClause(expected_clause_id, quick_parse(StateExpression, 'base state 2'))
+    expected_clause_1 = MPLClause(expected_clause_id, quick_parse(QueryExpression, 'base state 2'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 1)
     expected_clause_2 = MPLClause(expected_clause_id, quick_parse(QueryExpression, 'test variable > 10'))
 
     expected_clause_id = get_entity_id(expected_line_entry, 2)
-    expected_clause_3 = MPLClause(expected_clause_id, quick_parse(StateExpression, 'complex state layer 2a'))
+    expected_clause_3 = MPLClause(expected_clause_id, quick_parse(QueryExpression, 'complex state layer 2a'))
 
     expected_rule = MPLRule(
         get_entity_id(expected_line_entry),

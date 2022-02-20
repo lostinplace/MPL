@@ -11,8 +11,11 @@ class MPLOperator:
     LHType: Optional[str]
     behavior: str
     RHType: str
-    depth: int
+    depth: Optional[int] = None
 
+
+class MPLOperators:
+    CONSUME_LEFT = MPLOperator(None, '-', '>')
 
 S = {
     'ANY': None,

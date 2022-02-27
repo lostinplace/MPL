@@ -5,12 +5,13 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
-from mpl.interpreter.expression_evaluation.assignmment_expression_interpreter import AssignmentResult
+from mpl.interpreter.expression_evaluation.assignment_expression_interpreter import AssignmentResult
 from mpl.interpreter.expression_evaluation.query_expression_interpreter import postfix, symbolize_postfix, \
     evaluate_symbolized_postfix_stack, symbolize_expression, QueryResult
 from mpl.interpreter.expression_evaluation import QueryExpressionInterpreter, create_expression_interpreter, query_operations_dict, \
     AssignmentExpressionInterpreter
 from mpl.interpreter.expression_evaluation.scenario_expression_interpreter import ScenarioResult
+from mpl.interpreter.expression_evaluation.types import ChangeLedgerRef
 from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass, MPLEntity
 from mpl.lib import fs
 from mpl.lib.query_logic import eval_expr_with_context
@@ -194,7 +195,11 @@ def test_assignment_expression_interpreter():
 
         interpreter = create_expression_interpreter(expr)
         actual = interpreter.interpret(context)
-        assert actual == AssignmentResult(expected)
+
+        change_dict = {ChangeLedgerRef: expected}
+        expected_context = context | expected | change_dict
+
+        assert actual == AssignmentResult(expected_context)
 
 
 def test_scenario_expression_interpreter():

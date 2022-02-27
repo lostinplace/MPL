@@ -7,6 +7,7 @@ name = "pypi"
 networkx = "*"
 parsita = {git = "https://github.com/drhagen/parsita.git"}
 sympy = "*"
+cogdb = "*"
 
 [dev-packages]
 pytest = "*"

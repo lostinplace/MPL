@@ -18,6 +18,7 @@ class ExpressionResult(ABC):
 
 
 QueryLedgerRef = Reference('{}')
+ChangeLedgerRef = Reference('{CHANGES}')
 
 class ExpressionInterpreter(ABC):
 

@@ -2,7 +2,7 @@ import itertools
 from dataclasses import dataclass
 from numbers import Number
 from operator import itemgetter
-from typing import Collection, List, FrozenSet, Dict
+from typing import List, FrozenSet, Dict, Union
 
 from sympy import Expr
 
@@ -106,7 +106,7 @@ def evaluate_symbolized_postfix_stack(
         target=False
 ) -> FinalResultSet:
     index = 0
-    result = postfix_queue.copy()
+    result: List[Union[Expr, OperatorOperation, FinalResultSet]] = postfix_queue.copy()
     while index < len(result):
         item = result[index]
         match item:
@@ -128,6 +128,8 @@ def evaluate_symbolized_postfix_stack(
                     combinations = itertools.product(result[index - 2], result[index - 1])
                     tmp = map(lambda x: item.method(*x), combinations)
                     tmp = frozenset(tmp)
+                else:
+                    raise Exception("Unhandled operation type")
                 result[index - 2] = tmp
                 del result[index - 1: index + 1]
                 index -= 1
@@ -137,9 +139,6 @@ def evaluate_symbolized_postfix_stack(
     assert isinstance(out, FrozenSet)
     simplified = filter(bool, out)
     return frozenset(simplified)
-
-
-latest_entry_ref = Reference("{}")
 
 
 @dataclass(frozen=True, order=True)

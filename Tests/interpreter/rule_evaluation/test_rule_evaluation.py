@@ -56,23 +56,19 @@ def test_evaluate_rule():
             RuleInterpretation(
                 RuleInterpretationState.APPLICABLE,
                 {
-                    Reference('Enter Strike Zone'): MPLEntity(0, 'Enter Strike Zone', MPLEntityClass.TRIGGER, fs(1)),
                     Reference('Feel Secure'): MPLEntity(1, 'Feel Secure', MPLEntityClass.STATE, fs()),
-                    Reference('Attack'): MPLEntity(1, 'Attack', MPLEntityClass.STATE, fs(1, 12)),
+                    Reference('Attack'): MPLEntity(1, 'Attack', MPLEntityClass.STATE, fs(1, 9, 12)),
                 },
                 scenarios=fs(9)
             ),
         RE('!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure', contexts['fleeing wumpus']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
             {
-                Reference('Smell Prey'): MPLEntity(1, 'Smell Prey', MPLEntityClass.STATE, fs()),
-                Reference('Flee'): MPLEntity(1, 'Flee', MPLEntityClass.STATE, fs(2)),
                 Reference('noise'): MPLEntity(1, 'noise', MPLEntityClass.STATE, fs('safe')),
                 Reference('Feel Secure'): MPLEntity(1, 'Feel Secure', MPLEntityClass.STATE, fs(1)),
             }
         ),
         RE('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
-            Reference('Recover'): MPLEntity(0, 'Recover', MPLEntityClass.STATE, fs(5)),
             Reference('Hurt'): MPLEntity(1, 'Hurt', MPLEntityClass.STATE, fs()),
             Reference('Ok'): MPLEntity(1, 'Ok', MPLEntityClass.STATE, fs(1)),
         }),
@@ -88,7 +84,6 @@ def test_evaluate_rule():
             Reference('a'): MPLEntity(0, 'a', MPLEntityClass.STATE, fs()),
             Reference('b'): MPLEntity(1, 'b', MPLEntityClass.STATE, fs(1, 123)),
             Reference('c'): MPLEntity(1, 'c', MPLEntityClass.STATE, fs()),
-            Reference('d'): MPLEntity(1, 'd', MPLEntityClass.STATE, fs()),
         }),
     }
 
@@ -97,4 +92,4 @@ def test_evaluate_rule():
         interpreter = create_rule_interpreter(rule_expression)
         context = dict(input.context)
         actual = interpreter.interpret(context)
-        assert actual == expectation
+        assert actual == expectation, input.source

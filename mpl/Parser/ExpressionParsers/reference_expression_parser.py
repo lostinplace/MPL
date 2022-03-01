@@ -60,6 +60,10 @@ class Reference:
             return Reference(unsanitize_reference_name(refname))
         return symbol
 
+    @property
+    def id(self):
+        return hash(self)
+
     def __add__(self, other):
         return self.as_symbol() + other
 
@@ -125,7 +129,7 @@ def interpret_reference_expression(results):
         lineage = tuple(tmp[1:])
         return ReferenceExpression(main_ref, lineage)
     else:
-        return ReferenceExpression(results, tuple([]))
+        return ReferenceExpression(results, tuple())
 
 
 class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):

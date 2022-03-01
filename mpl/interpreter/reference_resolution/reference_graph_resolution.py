@@ -89,7 +89,7 @@ class MPLEntity:
     id: int
     name: str
     entity_class: MPLEntityClass
-    value: Optional[FrozenSet[Expr]]
+    value: Optional[FrozenSet[Expr | Number | str]]
 
     def __add__(self, other):
         pass

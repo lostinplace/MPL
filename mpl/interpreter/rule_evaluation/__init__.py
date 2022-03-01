@@ -8,14 +8,11 @@ from typing import Tuple, FrozenSet, Optional
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
-from mpl.interpreter.expression_evaluation import ExpressionInterpreter, create_expression_interpreter
-from mpl.interpreter.expression_evaluation.assignment_expression_interpreter import AssignmentResult
-from mpl.interpreter.expression_evaluation.query_expression_interpreter import QueryResult
-from mpl.interpreter.expression_evaluation.scenario_expression_interpreter import ScenarioResult
-from mpl.interpreter.expression_evaluation.target_expression_interpreter import TargetResult
+from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
+from mpl.interpreter.expression_evaluation.interpreters import AssignmentResult, create_expression_interpreter, \
+    QueryResult, ScenarioResult, TargetResult
 from mpl.interpreter.expression_evaluation.types import QueryLedgerRef, ChangeLedgerRef
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLRule, MPLEntityClass, \
-    MPLEntity
+from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass, MPLEntity
 from mpl.lib import fs
 from mpl.lib.query_logic import MPL_Context, FinalResultSet
 
@@ -89,8 +86,6 @@ class RuleInterpretationState(Enum):
     UNDETERMINED = auto()
 
 
-
-
 @dataclass(frozen=True, order=True)
 class RuleInterpretation:
     state: RuleInterpretationState
@@ -160,6 +155,17 @@ class RuleInterpreter:
         del result_context[ChangeLedgerRef]
 
         return RuleInterpretation(RuleInterpretationState.APPLICABLE, changes, this_name, scenarios)
+
+    @property
+    def references(self):
+        tmp = set()
+        for interpreter in self.expression_interpreters:
+            tmp |= interpreter.references
+        return frozenset(tmp)
+
+    @staticmethod
+    def from_expression(expression: RuleExpression) -> 'RuleInterpreter':
+        return create_rule_interpreter(expression)
 
 
 def rule_clause_to_expression_interpreter(clause: RuleClause, target=False) -> ExpressionInterpreter:

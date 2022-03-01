@@ -3,15 +3,14 @@ from typing import Tuple
 
 from parsita import TextParsers, longest, pred, opt
 
-from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers as AsExP, AssignmentExpression
-from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
+from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers as AsExP, \
+    AssignmentExpression
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressionParsers as ScExP, \
     ScenarioExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers as LExP
-from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpression, StateExpressionParsers as SExP
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator, MPLOperatorParsers as MOPs
 from mpl.lib.parsers.additive_parsers import track
-from mpl.lib.parsers.custom_parsers import check, back
+from mpl.lib.parsers.custom_parsers import back
 from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
 
 

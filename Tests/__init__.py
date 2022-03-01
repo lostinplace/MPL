@@ -8,7 +8,7 @@ from mpl.Parser.ExpressionParsers.assignment_expression_parser import Assignment
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
     DeclarationExpression
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression, RuleClause
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
@@ -95,6 +95,7 @@ parser_map ={
     RuleExpression: RuleExpressionParsers.expression,
     DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
     StringToken: SimpleValueTokenizers.string_token,
+    RuleClause: RuleExpressionParsers.any_clause,
 }
 
 

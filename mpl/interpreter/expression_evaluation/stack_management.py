@@ -1,8 +1,8 @@
 import itertools
-from dataclasses import dataclass
+from ast import literal_eval
 from numbers import Number
 from operator import itemgetter
-from typing import List, FrozenSet, Dict, Union
+from typing import Dict, List, Union, FrozenSet
 
 from sympy import Expr
 
@@ -12,13 +12,11 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceEx
 from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from mpl.Parser.Tokenizers.simple_value_tokenizer import NumberToken, StringToken
-from ast import literal_eval
-
-from mpl.interpreter.expression_evaluation.types import ExpressionInterpreter, ExpressionResult
+from mpl.interpreter.expression_evaluation.operators import OperatorOperation, OperationType, \
+    query_operations_dict
 from mpl.interpreter.expression_evaluation.types import symbolized_postfix_stack
-from mpl.interpreter.expression_evaluation.operators import OperationType, OperatorOperation, query_operations_dict
 from mpl.interpreter.expression_evaluation.types import postfix_stack
-from mpl.lib.query_logic import MPL_Context, eval_expr_with_context, FinalResultSet
+from mpl.lib.query_logic import MPL_Context, FinalResultSet, eval_expr_with_context
 
 
 def get_postfix_operand(operand, operation_dict: Dict[str, OperatorOperation]):
@@ -139,18 +137,3 @@ def evaluate_symbolized_postfix_stack(
     assert isinstance(out, FrozenSet)
     simplified = filter(bool, out)
     return frozenset(simplified)
-
-
-@dataclass(frozen=True, order=True)
-class QueryResult(ExpressionResult):
-    value: FinalResultSet
-
-
-@dataclass(frozen=True, order=True)
-class QueryExpressionInterpreter(ExpressionInterpreter):
-    expression: QueryExpression
-    symbolized: symbolized_postfix_stack
-
-    def interpret(self, context: MPL_Context) -> QueryResult:
-        result = evaluate_symbolized_postfix_stack(self.symbolized, context)
-        return QueryResult(result)

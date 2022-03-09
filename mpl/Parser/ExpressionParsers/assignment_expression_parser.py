@@ -21,6 +21,10 @@ class AssignmentExpression:
     rhs: ArithmeticExpression | QueryExpression | StringToken
     operator: AssignmentOperator
 
+    def __str__(self) -> str:
+        return f"{self.lhs} {self.operator} {self.rhs}"
+
+
 
 default_assignment_expression = AssignmentExpression(None, None, None)
 

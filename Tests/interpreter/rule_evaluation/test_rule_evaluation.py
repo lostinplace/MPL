@@ -59,32 +59,40 @@ def test_evaluate_rule():
                     Reference('Feel Secure'): MPLEntity(1, 'Feel Secure', MPLEntityClass.STATE, fs()),
                     Reference('Attack'): MPLEntity(1, 'Attack', MPLEntityClass.STATE, fs(1, 9, 12)),
                 },
-                scenarios=fs(9)
+                scenarios=fs(9),
+                source='<Enter Strike Zone> ~> %{9} -> Feel Secure -> Attack'
             ),
         RE('!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure', contexts['fleeing wumpus']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
             {
                 Reference('noise'): MPLEntity(1, 'noise', MPLEntityClass.STATE, fs('safe')),
                 Reference('Feel Secure'): MPLEntity(1, 'Feel Secure', MPLEntityClass.STATE, fs(1)),
-            }
+            },
+            source='!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure'
         ),
-        RE('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
-            Reference('Hurt'): MPLEntity(1, 'Hurt', MPLEntityClass.STATE, fs()),
-            Reference('Ok'): MPLEntity(1, 'Ok', MPLEntityClass.STATE, fs(1)),
-        }),
-        RE('a -> b', contexts['simple']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
-            Reference('a'): MPLEntity(0, 'a', MPLEntityClass.STATE, fs()),
-            Reference('b'): MPLEntity(1, 'b', MPLEntityClass.STATE, fs(1)),
-        }),
+        RE('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(RuleInterpretationState.APPLICABLE,
+            {
+                Reference('Hurt'): MPLEntity(1, 'Hurt', MPLEntityClass.STATE, fs()),
+                Reference('Ok'): MPLEntity(1, 'Ok', MPLEntityClass.STATE, fs(1)),
+            },
+            source='Recover ~> Hurt -> Ok'
+        ),
+        RE('a -> b', contexts['simple']): RuleInterpretation(RuleInterpretationState.APPLICABLE,
+            {
+                Reference('a'): MPLEntity(0, 'a', MPLEntityClass.STATE, fs()),
+                Reference('b'): MPLEntity(1, 'b', MPLEntityClass.STATE, fs(1)),
+            },
+            source='a -> b'
+        ),
         RE('b -> a', contexts['simple']): RuleInterpretation(RuleInterpretationState.NOT_APPLICABLE, {
             Reference('a'): MPLEntity(0, 'a', MPLEntityClass.STATE, fs(1)),
             Reference('b'): MPLEntity(1, 'b', MPLEntityClass.STATE, fs()),
-        }),
+        }, source='b -> a'),
         RE('a -> c -> b', contexts['simple with c and d']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
             Reference('a'): MPLEntity(0, 'a', MPLEntityClass.STATE, fs()),
             Reference('b'): MPLEntity(1, 'b', MPLEntityClass.STATE, fs(1, 123)),
             Reference('c'): MPLEntity(1, 'c', MPLEntityClass.STATE, fs()),
-        }),
+        }, source='a -> c -> b'),
     }
 
     for input, expectation in expectations.items():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import zip_longest
 from typing import Union, Tuple
 
 from parsita import TextParsers, fwd, lit, longest
@@ -23,6 +24,19 @@ class StateOperation:
 class StateExpression:
     operands: Tuple[ReferenceExpression | 'StateExpression' | Negation]
     operators: Tuple[StateOperator]
+
+    def __str__(self):
+        result = ''
+        for operand, operator in zip_longest(self.operands, self.operators):
+            match operand:
+                case StateExpression():
+                    result += f'({operand})'
+                case _:
+                    result += str(operand)
+            if operator is not None:
+                result += str(operator)
+        return result
+
 
 
 def interpret_negated_expression(parser_result):

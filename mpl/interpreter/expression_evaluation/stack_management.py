@@ -95,7 +95,7 @@ def symbolize_expression(
 
     postfix_queue = postfix(expression, operations)
     symbolized = symbolize_postfix(postfix_queue)
-    return symbolized
+    return tuple(symbolized)
 
 
 def evaluate_symbolized_postfix_stack(
@@ -104,7 +104,7 @@ def evaluate_symbolized_postfix_stack(
         target=False
 ) -> FinalResultSet:
     index = 0
-    result: List[Union[Expr, OperatorOperation, FinalResultSet]] = postfix_queue.copy()
+    result: List[Union[Expr, OperatorOperation, FinalResultSet]] = list(postfix_queue)
     while index < len(result):
         item = result[index]
         match item:

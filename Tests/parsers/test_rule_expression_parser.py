@@ -7,8 +7,7 @@ from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from Tests import collect_parsing_expectations, qse, quick_parse
 
 
-def test_rule_expression_parsers():
-    expectations = {
+expectations = {
         '!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure': RuleExpression(
             (
                 RuleClause('query', quick_parse(QueryExpression, '!Smell Prey & Flee')),
@@ -110,6 +109,17 @@ def test_rule_expression_parsers():
 
     }
 
+
+def test_rule_expression_parsers():
+
     for result in collect_parsing_expectations(expectations, RuleExpressionParsers.expression):
         result = result.as_strings()
-        assert result.actual.replace('Tracked', '') == result.expected, result.parser_input
+        assert result.actual.replace('Tracked', '') == result.expected.replace('Tracked', '') , result.parser_input
+
+
+def test_rule_expression_string_converstion():
+
+    for expectation in expectations:
+        result = quick_parse(RuleExpression, expectation)
+        actual = str(result)
+        assert actual.strip() == expectation.strip()

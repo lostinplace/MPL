@@ -13,6 +13,11 @@ class MPLOperator:
     RHType: str
     depth: Optional[int] = None
 
+    def __str__(self):
+        shaft = '~' if self.behavior == 'OBSERVE' else '-'
+        tip = '>' if self.RHType == 'STATE' else '@'
+        return f'{shaft}{tip}'
+
 
 class MPLOperators:
     CONSUME_LEFT = MPLOperator(None, '-', '>')
@@ -80,10 +85,16 @@ class StateOperatorParsers(TextParsers, whitespace=None):
 class QueryOperator:
     contents: str
 
+    def __str__(self):
+        return self.contents
+
 
 @dataclass(frozen=True, order=True)
 class ArithmeticOperator:
     contents: str
+
+    def __str__(self):
+        return self.contents
 
 
 class ArithmeticOperatorParsers(TextParsers, whitespace=None):
@@ -124,6 +135,9 @@ class QueryOperatorParsers(TextParsers, whitespace=None):
 @dataclass(frozen=True, order=True)
 class AssignmentOperator:
     contents: str
+
+    def __str__(self):
+        return self.contents
 
 
 class AssignmentOperatorParsers(TextParsers, whitespace=None):

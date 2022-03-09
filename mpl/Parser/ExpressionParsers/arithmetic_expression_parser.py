@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import zip_longest
 from typing import Union, Tuple
 
 from parsita import TextParsers, fwd, longest
@@ -21,6 +22,18 @@ class ArithmeticOperation:
 class ArithmeticExpression:
     operands: Tuple[NumberToken | ReferenceExpression | 'ArithmeticExpression']
     operators: Tuple[ArithmeticOperator]
+
+    def __str__(self):
+        result = ''
+        for operand, operator in zip_longest(self.operands, self.operators):
+            match operand:
+                case ArithmeticExpression():
+                    result += f'({operand})'
+                case _:
+                    result += str(operand)
+            if operator is not None:
+                result += str(operator)
+        return result
 
 
 def interpret_simple_expression(parser_results):

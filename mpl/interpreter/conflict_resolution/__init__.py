@@ -1,11 +1,13 @@
 import dataclasses
 import random
 from dataclasses import dataclass
-from typing import List, Set, FrozenSet
+from typing import List, Set, FrozenSet, Tuple, Dict
 
 import networkx as nx
 
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.interpreter.rule_evaluation import RuleInterpretation
+from mpl.lib.query_logic import MPL_Context
 
 
 def compress_conflict_list(query_conflicts: List[Set[RuleInterpretation]]) -> List[Set[RuleInterpretation]]:

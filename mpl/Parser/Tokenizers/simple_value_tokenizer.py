@@ -18,6 +18,9 @@ This Parser defines the value tokens that are available in expressions
 class NumberToken:
     content: str
 
+    def __str__(self):
+        return self.content
+
 
 """
 > STRING = r/`([^`]|\\`)*`/
@@ -26,6 +29,9 @@ class NumberToken:
 @dataclass(frozen=True, order=True)
 class StringToken:
     content: str
+
+    def __str__(self):
+        return f'`{self.content}`'
 
 
 """

@@ -45,6 +45,12 @@ class Reference:
     name: str
     type: Optional[str] = None
 
+    def stringify(self):
+        result = f'{self.name}'
+        if self.type:
+            result += f': {self.type}'
+        return result
+
     def sanitize(self) -> 'Reference':
         return Reference(sanitize_reference_name(self.name), self.type)
 
@@ -109,6 +115,14 @@ class DeclarationExpression:
 class ReferenceExpression:
     value: Reference
     lineage: Tuple[Reference]
+
+    def __str__(self):
+        if self.value.name == 'void':
+            return '*'
+
+        lineage_str = '.'.join(ref.name for ref in self.lineage)
+        lineage_str = lineage_str + '.' if lineage_str else ''
+        return f"{lineage_str}{self.value.stringify()}"
 
 
 def to_reference(reference: ReferenceToken, type):

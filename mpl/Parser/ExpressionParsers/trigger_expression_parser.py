@@ -15,6 +15,12 @@ class TriggerExpression:
     name: Reference
     message: Optional[ReferenceExpression]
 
+    def __str__(self):
+        message_str =''
+        if self.message:
+            message_str = f' ({self.message})'
+        return f"<{self.name.name}>{message_str}"
+
 
 def interpret_expression(name:ReferenceExpression, message):
     name_ref = dataclasses.replace(name.value, type='trigger')

@@ -1,6 +1,6 @@
 from abc import ABC
 from numbers import Number
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from sympy import Expr
 
@@ -9,7 +9,7 @@ from mpl.interpreter.expression_evaluation.operators import OperatorOperation
 from mpl.lib.query_logic import FinalResultSet
 
 postfix_stack = List[Union[Number, Reference, OperatorOperation]]
-symbolized_postfix_stack = List[Union[Expr, OperatorOperation]]
+symbolized_postfix_stack = Tuple[Union[Expr, OperatorOperation]]
 
 
 class ExpressionResult(ABC):

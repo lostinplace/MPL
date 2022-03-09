@@ -1,19 +1,26 @@
 import dataclasses
 from collections import UserDict
-from typing import FrozenSet, Dict, Union, Set
+from typing import FrozenSet, Dict, Union, Set, Tuple
 
 from sympy import Expr
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
 from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
+from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretation
 
 ref_name = Union[str, Ref]
+
+context_diff = Dict[str, Tuple[FrozenSet, FrozenSet]]
 
 
 class EngineContext(UserDict):
     ref_hashes: Dict[Reference, int] = {}
     hash_refs: Dict[int, Reference] = {}
+
+    @property
+    def active(self) -> FrozenSet[Reference]:
+        return frozenset(ref for ref in self if self.get(ref).value)
 
     @staticmethod
     def from_references(references: FrozenSet[Reference]) -> 'EngineContext':
@@ -23,13 +30,13 @@ class EngineContext(UserDict):
             result.ref_hashes[ref] = ref_hash
             result.hash_refs[ref_hash] = ref
             # TODO: this doesn't differentiate between different types of entities, e.g. triggers.
-            #  Figure out how these should be handled in the  reference graph and updddate it here.
+            #  Figure out how these should be handled in the  reference graph and update it here.
             entity = MPLEntity(ref_hash, ref.name, MPLEntityClass.STATE, frozenset())
             result[ref] = entity
         return result
 
     @staticmethod
-    def from_interpreter(interpreter: ExpressionInterpreter) -> 'EngineContext':
+    def from_interpreter(interpreter: ExpressionInterpreter | RuleInterpreter) -> 'EngineContext':
         references = interpreter.references
         return EngineContext.from_references(references)
 
@@ -37,8 +44,14 @@ class EngineContext(UserDict):
         match ref:
             case Reference():
                 existing = self.get(ref)
-                addition = value or hash(ref)
-                new_value = existing.value | {addition}
+                match value:
+                    case None:
+                        new_value = existing.value | {ref.id}
+                    case frozenset() | set():
+                        new_value = value
+                    case _:
+                        new_value = existing.value | {value}
+
                 new_entity = dataclasses.replace(existing, value=new_value)
 
                 return EngineContext(self | {ref: new_entity})
@@ -55,5 +68,29 @@ class EngineContext(UserDict):
 
     def to_dict(self) -> Dict[Reference, MPLEntity | Expr]:
         return self.data
+
+    def apply(self, interpretations: FrozenSet[RuleInterpretation]) -> 'EngineContext':
+        sum_of_changes = dict()
+        for interpretation in interpretations:
+            sum_of_changes |= interpretation.changes
+        return self | sum_of_changes
+
+    @staticmethod
+    def diff(
+            initial_context: 'EngineContext',
+            new_context: 'EngineContext'
+    ) -> Dict[str, Tuple[FrozenSet, FrozenSet]]:
+        out = dict()
+        for key in new_context:
+            old_val = initial_context.get(key).value
+            new_val = new_context.get(key).value
+            if old_val == new_val:
+                continue
+            diff = old_val, new_val
+            out[key.name] = diff
+        return out
+
+    def get_diff(self, other: 'EngineContext') -> context_diff:
+        return EngineContext.diff(self, other)
 
 

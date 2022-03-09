@@ -8,6 +8,9 @@ networkx = "*"
 parsita = {git = "https://github.com/drhagen/parsita.git"}
 sympy = "*"
 cogdb = "*"
+prompt_toolkit = "*"
+termcolor = "*"
+Pygments = "*"
 
 [dev-packages]
 pytest = "*"

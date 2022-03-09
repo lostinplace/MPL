@@ -10,6 +10,9 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 class ScenarioExpression:
     value: QueryExpression
 
+    def __str__(self):
+        return f'%{{{self.value}}}'
+
 
 class ScenarioExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     expression = '%{' >> QEP.expression << '}' > ScenarioExpression

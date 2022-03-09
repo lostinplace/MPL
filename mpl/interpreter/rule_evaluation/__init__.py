@@ -109,6 +109,7 @@ class RuleInterpreter:
     expression_interpreters: Tuple[ExpressionInterpreter, ...]
     operators: Tuple[MPLOperator, ...]
     name: Optional[str] = None
+    expression: Optional[RuleExpression] = None
 
     def interpret(self, context: MPL_Context) -> RuleInterpretation:
         this_name = self.name or ''
@@ -127,6 +128,8 @@ class RuleInterpreter:
                     result_context[QueryLedgerRef] = (value_condensed,) + result_context[QueryLedgerRef]
                 case QueryResult(), MPLOperator(_, 'OBSERVE', __, _):
                     result_context[QueryLedgerRef] = (fs(1),) + result_context[QueryLedgerRef]
+                case AssignmentResult() as x, None:
+                    result_context |= x.value
                 case AssignmentResult() as x, MPLOperator(_, 'OBSERVE', __, _):
                     result_context |= x.value
                     result_context[QueryLedgerRef] = (fs(1),) + result_context[QueryLedgerRef]
@@ -151,8 +154,10 @@ class RuleInterpreter:
 
         changes = result_context.get(ChangeLedgerRef) or dict()
 
-        del result_context[QueryLedgerRef]
-        del result_context[ChangeLedgerRef]
+        if QueryLedgerRef in result_context:
+            del result_context[QueryLedgerRef]
+        if ChangeLedgerRef in result_context:
+            del result_context[ChangeLedgerRef]
 
         return RuleInterpretation(RuleInterpretationState.APPLICABLE, changes, this_name, scenarios)
 
@@ -187,5 +192,5 @@ def create_rule_interpreter(rule: RuleExpression) -> RuleInterpreter:
                 interpreter = rule_clause_to_expression_interpreter(x)
         interpreters.append(interpreter)
 
-    return RuleInterpreter(tuple(interpreters), rule.operators)
+    return RuleInterpreter(tuple(interpreters), rule.operators, str(rule), rule)
 

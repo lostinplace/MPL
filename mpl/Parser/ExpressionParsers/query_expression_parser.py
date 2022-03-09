@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import zip_longest
 from typing import Union, Tuple
 
 from parsita import TextParsers, fwd, longest, lit
@@ -19,6 +20,9 @@ from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpres
 class Negation:
     operand: Union['QueryExpression', 'ReferenceExpression', 'StateExpression']
 
+    def __str__(self):
+        return f'!{str(self.operand)}'
+
 
 @dataclass(frozen=True, order=True)
 class QueryExpression:
@@ -28,6 +32,17 @@ class QueryExpression:
     operators: Tuple[
         QueryOperator | ArithmeticOperator, ...
     ]
+
+    def __str__(self):
+        result = ''
+        if len(self.operators) == 1 and self.operators[0] == QueryOperator('!'):
+            return f'!{self.operands[0]}'
+        for operand, operator in zip_longest(self.operands, self.operators):
+            result += str(operand)
+            if operator:
+                result += f' {operator} '
+        return result
+
 
 
 def interpret_negation(negation: Negation) -> QueryExpression:

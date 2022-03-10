@@ -1,4 +1,4 @@
-## StateDB
+## MPL = Machine Policy Language
 
 ### What is this?
 

@@ -22,6 +22,10 @@ class EngineContext(UserDict):
     def active(self) -> FrozenSet[Reference]:
         return frozenset(ref for ref in self if self.get(ref).value)
 
+    @property
+    def ref_names(self) -> FrozenSet[str]:
+        return frozenset(ref.name for ref in self)
+
     @staticmethod
     def from_references(references: FrozenSet[Reference]) -> 'EngineContext':
         result = EngineContext()

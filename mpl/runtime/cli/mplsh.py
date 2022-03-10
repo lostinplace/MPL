@@ -20,11 +20,14 @@ from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.runtime.cli.command_parser import CommandParsers, SystemCommand, TickCommand, ExploreCommand, QueryCommand, \
     ActivateCommand, LoadCommand
 
-completer = NestedCompleter.from_nested_dict({
+completion_dict = ({
     'help': None,
     'quit': None,
     'explore': None,
 })
+
+
+
 
 
 def is_valid_command(text):
@@ -39,12 +42,13 @@ validator = Validator.from_callable(
 
 
 class Toolbar:
-    outer_track = 1
+    active_refs: int = 0
+    active_rules: int = 0
 
     @staticmethod
     def bottom_toolbar():
-        Toolbar.outer_track += 1
-        return [('class:bottom-toolbar', f'entries = {Toolbar.outer_track}')]
+        text = f'Active Refs = {Toolbar.active_refs} | Active Rules = {Toolbar.active_rules}'
+        return [('class:bottom-toolbar', f'entries = {text}')]
 
 
 style = Style.from_dict({
@@ -98,7 +102,7 @@ def format_data_for_cli_output(response, interior=True) -> str:
         case Reference():
             result = response.name
         case RuleExpression():
-            result = str(response.name)
+            result = str(response)
         case MPLEntity():
             if response.value:
                 contents = format_data_for_cli_output(response.value)
@@ -164,7 +168,6 @@ def run_interactive_session():
     our_history = FileHistory(history_path)
     session = PromptSession(history=our_history)
     prompt_kwargs = {
-        'completer': completer,
         'auto_suggest': AutoSuggestFromHistory(),
         'validator': validator,
         'style': style,
@@ -174,6 +177,13 @@ def run_interactive_session():
     engine = MPLEngine()
 
     while True:
+        Toolbar.active_refs = len(engine.context.active)
+        Toolbar.active_rules = len(engine.rule_interpreters)
+        ref_names = set(engine.context.ref_names)
+        completion_dict['+'] = ref_names
+        completion_dict['?'] = ref_names
+        completer = NestedCompleter.from_nested_dict(completion_dict)
+        prompt_kwargs['completer'] = completer
         command = session.prompt('>  ', **prompt_kwargs)
         command_result = execute_command(engine, command)
         if command_result == SystemCommand.QUIT:

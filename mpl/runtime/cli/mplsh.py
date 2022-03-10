@@ -14,6 +14,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
+from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity
 from mpl.interpreter.rule_evaluation import RuleInterpreter
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.runtime.cli.command_parser import CommandParsers, SystemCommand, TickCommand, ExploreCommand, QueryCommand, \
@@ -53,6 +54,62 @@ style = Style.from_dict({
 bindings = KeyBindings()
 
 
+def get_help() -> str:
+    text = """
+    {rule}              Add Rule to current engine
+    .                   increments the state of the engine, then prints the active references
+    .{n}                increments the state of the engine n times then prints the active references
+    +{name}	            activates the named reference
+    +{name}={value}	    activates the named reference with the provided value
+    explore {n}	        conducts an exploration of n iterations and prints the distribution of outcomes
+    ?                   prints the current engine context
+    ?{name}             prints the state of the named reference
+    quit                exits the environment
+    help                shows the list of commands
+    """
+    return text
+
+
+def format_data_for_cli_output(response, interior=True) -> str:
+    match response:
+        case str():
+            result = response
+        case dict() | EngineContext():
+            results = []
+            for k, v in response.items():
+                k_out = format_data_for_cli_output(k)
+                v_out = format_data_for_cli_output(v)
+                if v_out:
+                    results.append(f'{k_out} :: {v_out}')
+            result = '\n'.join(results)
+        case v1, v2:
+            v1_str = format_data_for_cli_output(v1)
+            v2_str = format_data_for_cli_output(v2)
+            result = f'{v1_str} → {v2_str}'
+        case set() | frozenset():
+            results = map(format_data_for_cli_output, response)
+            delimiter = ',' if interior else '\n'
+            results_str = delimiter.join(results)
+            result = f'{{{results_str}}}' if interior else results_str
+        case list():
+            results = map(format_data_for_cli_output, response)
+            results_str = ','.join(results)
+            result = f'[{results_str}]'
+        case Reference():
+            result = response.name
+        case RuleExpression():
+            result = str(response.name)
+        case MPLEntity():
+            if response.value:
+                contents = format_data_for_cli_output(response.value)
+                result = f'Entity({contents})'
+            else:
+                result = ''
+        case _:
+            result = str(response)
+    return result
+
+
 def execute_command(engine: MPLEngine, command: str):
     result = CommandParsers.command.parse(command)
     value = result.value
@@ -60,7 +117,7 @@ def execute_command(engine: MPLEngine, command: str):
         case SystemCommand.QUIT:
             return value
         case SystemCommand.HELP:
-            return 'Help'
+            return get_help()
         case SystemCommand.LIST:
             expressions = {x.name for x in engine.rule_interpreters}
             return expressions
@@ -81,7 +138,7 @@ def execute_command(engine: MPLEngine, command: str):
             return result
         case ExploreCommand() as explore_command:
             # TODO: explore command
-            return explore_command
+            return 'NOT IMPLEMENTED'
         case QueryCommand() as query_command:
             match query_command.reference:
                 case Reference():
@@ -100,8 +157,6 @@ def execute_command(engine: MPLEngine, command: str):
             resolved = resolve_conflicts(conflicts)
             result = engine.apply(resolved)
             return result
-
-
 
 
 def run_interactive_session():
@@ -123,8 +178,8 @@ def run_interactive_session():
         command_result = execute_command(engine, command)
         if command_result == SystemCommand.QUIT:
             return
-
-        print(command_result)
+        output = format_data_for_cli_output(command_result, False)
+        print(output)
 
 
 if __name__ == '__main__':

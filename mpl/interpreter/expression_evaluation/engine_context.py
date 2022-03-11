@@ -86,8 +86,10 @@ class EngineContext(UserDict):
     ) -> Dict[str, Tuple[FrozenSet, FrozenSet]]:
         out = dict()
         for key in new_context:
-            old_val = initial_context.get(key).value
-            new_val = new_context.get(key).value
+            old_entity = initial_context.get(key)
+            new_entity = new_context.get(key)
+            old_val = old_entity.value
+            new_val = new_entity.value
             if old_val == new_val:
                 continue
             diff = old_val, new_val

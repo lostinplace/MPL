@@ -94,6 +94,10 @@ class MPLEntity:
     def __add__(self, other):
         pass
 
+    @staticmethod
+    def from_reference(reference: Reference, value: FrozenSet[Expr | Number | str] = frozenset()):
+        return MPLEntity(reference.id, reference.name, MPLEntityClass.STATE, value)
+
 
 def get_entity_id(line: MPLLine, *args) -> int:
     # TODO: rework entity ids, the resolver system should be unaware of them until the end

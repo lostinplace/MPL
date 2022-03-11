@@ -67,6 +67,18 @@ def test_command_sequences():
     ]
 
     expectations = {
+        ('state one->state two', '+state one', '.', '.-1'): [
+            None,
+            {'state one': (fs(), fs(Ref('state one').id))},
+            {
+                'state one': (fs(Ref('state one').id), fs()),
+                'state two': (fs(), fs(Ref('state one').id)),
+            },
+            {
+                'state one': (fs(), fs(Ref('state one').id)),
+                'state two': (fs(Ref('state one').id), fs()),
+            },
+        ],
         ('A->B->C', '.', '?A', '+A'): [
             quick_parse(RuleExpression, 'A->B->C'),
             None,

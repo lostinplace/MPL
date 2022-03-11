@@ -106,7 +106,7 @@ class CommandParsers(TextParsers):
     filepath = opt('/') & repsep(reg(r'[^/]+'), '/', min=1)
     load = lit('load') >> filepath > LoadCommand.interpret
 
-    tick = reg(r'\.') >> opt(reg(r'\d+')) > TickCommand.interpret
+    tick = reg(r'\.') >> opt(reg(r'-?\d+')) > TickCommand.interpret
     assign = '+' >> longest(RefExP.expression, AExpP.expression) > ActivateCommand.interpret
     explore = 'explore' >> opt(reg(r'\d+')) > ExploreCommand.interpret
     query = '?' >> opt(RefExP.expression) > QueryCommand.interpret

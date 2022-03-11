@@ -61,11 +61,24 @@ full_context = {
     Reference('Seven'): MPLEntity(1, 'Seven', MPLEntityClass.STATE, fs(11)),
 }
 
+"""
+Turn Start -> Turn Action
+!Turn Action ~> Turn End
+
+Turn Start ~> Move
+
+Turn Action -> %{believed attack damage} -> Attack
+Turn Action -> extern(calculate_move_value) -> Double Move
+Turn Action -> %{spell damage} -> Spell
+
+"""
+
+
 
 def test_conflict_resolution_simple_conflict():
 
     A = 'One -> Two'
-    B = 'Two -> Three -> Four'
+    B = 'Two & Three -> Four'
     C = 'Four -> Five'
     D = 'Six -> Seven'
     E = 'One -> Three -> Five'

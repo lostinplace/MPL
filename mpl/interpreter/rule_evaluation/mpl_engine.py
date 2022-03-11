@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet
+from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, List, Generator
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
@@ -14,6 +14,7 @@ from mpl.lib import fs
 class MPLEngine:
     rule_interpreters: Set[RuleInterpreter] = frozenset()
     context: EngineContext = EngineContext()
+    history: Tuple[context_diff, ...] = ()
 
     def add(self, rules: RuleExpression | Set[RuleExpression]):
         rule: Set[RuleExpression]
@@ -34,17 +35,43 @@ class MPLEngine:
 
     def tick(self, count: int = 1) -> Dict[str, Tuple[Any, Any]]:
         original_context = self.context
-        for tick in range(count):
-            interpretations = set()
-            for rule_interpreter in self.rule_interpreters:
-                result = rule_interpreter.interpret(self.context)
-                if result.state == RuleInterpretationState.APPLICABLE:
-                    interpretations.add(result)
-            conflicts = identify_conflicts(interpretations)
-            resolved = resolve_conflicts(conflicts)
-            self.apply(resolved)
-        output = original_context.get_diff(self.context)
+        if count > 0:
+            #  tick forward
+            for tick in range(count):
+                interpretations = set()
+                for rule_interpreter in self.rule_interpreters:
+                    result = rule_interpreter.interpret(self.context)
+                    if result.state == RuleInterpretationState.APPLICABLE:
+                        interpretations.add(result)
+                conflicts = identify_conflicts(interpretations)
+                resolved = resolve_conflicts(conflicts)
+                self.apply(resolved)
+
+            output = original_context.get_diff(self.context)
+            self.history = (output,) + self.history
+        elif count < 0:
+            # tick backward
+            for tick in range(abs(count)):
+                this_tick = self.history[0]
+                self.history = self.history[1:]
+                resolved = MPLEngine.invert_diff(this_tick)
+                self.apply(resolved)
+            output = original_context.get_diff(self.context)
+
         return output
+
+    @staticmethod
+    def invert_diff(diff: context_diff) -> FrozenSet[RuleInterpretation]:
+        diff_change = dict()
+        diff_descriptors = list()
+        for key, diff_item in diff.items():
+            key = Reference(key)
+            diff_change[key] = MPLEntity.from_reference(key, diff_item[0])
+            descriptor = f'{key}::{diff_item[1]}→{diff_item[0]}'
+            diff_descriptors.append(descriptor)
+        name = ';'.join(diff_descriptors)
+        interpretation = RuleInterpretation(RuleInterpretationState.APPLICABLE, diff_change, name)
+        return fs(interpretation)
 
     def activate(self, ref: Reference | Set[Reference],  value: Any = None) -> context_diff:
         old_context = self.context

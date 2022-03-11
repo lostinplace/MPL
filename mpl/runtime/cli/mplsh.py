@@ -135,8 +135,7 @@ def execute_command(engine: MPLEngine, command: str):
             return result
         case TickCommand():
             start_context = engine.context
-            for _ in range(value.number):
-                engine.tick()
+            engine.tick(value.number)
             end_context = engine.context
             result = start_context.get_diff(end_context)
             return result

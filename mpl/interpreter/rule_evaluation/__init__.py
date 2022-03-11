@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from functools import reduce
 from itertools import zip_longest
+from numbers import Number
 from typing import Tuple, FrozenSet, Optional
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
@@ -95,7 +96,15 @@ class RuleInterpretation:
 
     @property
     def scenario_weight(self) -> int:
-        return sum(x.weight for x in self.scenarios) or 1
+        total_weight = 0
+        for scenario in self.scenarios:
+            match scenario:
+                case ScenarioResult(weight=x):
+                    total_weight += x
+                case Number(x):
+                    total_weight += x
+
+        return total_weight or 1
 
     def __hash__(self):
         return hash((self.state, tuple(self.changes.items()), self.scenarios))

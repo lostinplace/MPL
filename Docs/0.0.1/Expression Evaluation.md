@@ -1,24 +1,28 @@
+# Expression Evaluation
+
+This details the procedures for evaluating rules and expressions.
+
 ## State Transistion Expression
 
 ### AND
 
 ` a & b -> c `
 
-> if a ≠ ∅ ∧ b ≠ ∅, then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c , a=∅, b=∅
+if a ∧ b , then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c , a=∅, b=∅
 
 ### OR
 
-`a | b -> c | d`
+`a | b -> c`
 
-> if a ∪ b ≠ ∅, then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c, δ ⊆ d, a=∅, b=∅
+if a ∪ b ≠ ∅, then δ ≝ a ∪ b, after the rule is executed, δ ⊆ c, a=∅, b=∅
 
 ### XOR
 
-`a ^ b -> c ^ d`
+`a ^ b -> c`
 
-if a ⊻ b ≠ ∅, then δ ≝ a ∪ b
+if a ⊻ b, then δ ≝ a ∪ b
 
-after the rule is executed: δ ⊆ c ⊻ d, a=∅, b=∅
+after the rule is executed: δ ⊆ c, a=∅, b=∅
 
 ### NOT
 
@@ -163,65 +167,43 @@ a -> %{4} ~> 10 -> d
 Note that the state of the observation collapses when provided with more information, in this case the result of the arithmetic operation `10`.
 
 
-## Assignment expressions
+## Target Expressions
 
-### Increment
+The last expression in a rule defines a target for the results of all  prior expreessions.  Targets are assessed differently.
 
-the `+=` operation will add the RHS to the LHS, and yield back nothing 
-
-### Decrement
-
-the `-=` operation will subtract the RHS from the LHS, and yield back what was removed
-
-## Logical Expressions
-
-### Truth
-
-a state is true when it possesses a non-zero vector
-
-### Expression Results
-
-Logical expression results have 3 components, As Source, As Target, and Value
-
-```
-Result:
-    Operation: AND | OR | XOR | EQ | NEQ | GT | GTE | LT | LTE
-    As Source: Set[Reference | Set[Reference]]
-    As Target: Set[Reference | Set[Reference]]
-    Value: str | Number | Vector
-```
-
-### Negation
-when an entity is negated using the `!` operator, logical operations will only return truth for that operator when it is not active (meaning it has been assigned a non-zero vector)
+1. A Reference is not a valid target if it is used in an arithmetic expression
+2. Generally logical expressions operate on the principle that the tarrget expression must be true after the assignmeent of results to the targets, logic is described below.
 
 
 ### AND
 
-```
-A: state
-    AA
-    AB
+` a -> b & c `
 
-B: state
+if a then δ ≝ a
 
-A & B === Result(source:{}, target:{A,B})
+after the rule is executed, δ ⊆ a, δ ⊆ a, a=∅
 
-A = 1
-B = 2*x
+### OR
 
-A & B === Result(source:{A:1, B:2*x}, target:{A,B})
+`a -> c | d`
 
-A & !B === Result(source:{}, target:{A})
+if a then δ ≝ a 
 
-A & !B -> C
-C -> A & !B
+after the rule is executed, 
 
-the value of AND === if both entities are active, the sum of those entities
+δ ⊆ c ∪ d such that if !c then !c and if !d then !d
+a=∅
 
-A & B & C -> D
+### XOR
 
-A + B + C + D
-```
+`a -> c ^ d`
+
+if a and c ⊻ d then δ ≝ a
+
+after the rule is executed: 
+δ ⊆ c ⊻ d such that if !c then !c and if !d then !d
+a=∅
+
 
 
 

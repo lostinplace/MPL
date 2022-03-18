@@ -93,7 +93,7 @@ class TrackParser(Generic[Input, Output], Parser[Input, Input]):
         return self.name_or_nothing() + 'track({})'.format(repr(self.parser))
 
 
-def track(parser: Parser[Input, Output], tag:Any=None) -> ExcludingParser:
+def track(parser: Parser[Input, Output], tag:Any=None) -> TrackParser:
     """Tracks metadata about the result of the provided parser
 
     Args:

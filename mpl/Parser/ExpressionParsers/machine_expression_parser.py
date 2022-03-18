@@ -1,39 +1,40 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from dataclasses import dataclass
 
 from parsita import TextParsers, reg, longest, Success
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
-    ReferenceExpressionParsers as RefExP, DeclarationExpression
+    ReferenceExpressionParsers as RefExP
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers as RuleExP
 
 from mpl.lib.parsers.additive_parsers import track, TrackedValue
 from mpl.lib.parsers.custom_parsers import check
 from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
 
+@dataclass(frozen=True, order=True)
+class BlankLine:
+    pass
 
-def get_definition(rule_expression: RuleExpression) -> Optional[Tuple[str, str]]:
-    if len(rule_expression.clauses) != 1:
-        return None
-    sole_clause = rule_expression.clauses[0]
-    if sole_clause.type != 'state':
-        return None
+    @staticmethod
+    def interpret(*_) -> BlankLine:
+        return BlankLine()
 
-    if len(sole_clause.expression.operands) != 1:
-        return None
+@dataclass(frozen=True, order=True)
+class MachineFile:
+    lines: SeparatedList[ReferenceExpression | RuleExpression | TrackedValue]
 
-    sole_operand:ReferenceExpression = sole_clause.expression.operands[0]
-    if not isinstance(sole_operand, ReferenceExpression):
-        return None
+    @staticmethod
+    def parse(text: str) -> MachineFile:
+        result = MachineDefinitionExpressionParsers.machine_file.parse(text)
+        assert isinstance(result, Success)
+        return result.value
 
-    reference = sole_operand.value
-    ref_name, ref_type = reference.name, reference.type.content
-
-    if ref_type not in {'machine', 'state'} :
-        return None
-
-    return ref_name, ref_type
+    @staticmethod
+    def from_file(path: str) -> MachineFile:
+        with open(path, 'r') as f:
+            content = f.read()
+            return MachineFile.parse(content)
 
 
 class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
@@ -41,17 +42,8 @@ class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
     iw = ignored_whitespace
 
     rule_line = iw >> track(RuleExP.expression) << iw
-    declaration_line = iw >> track(RefExP.declaration_expression) << iw
-    empty_line = iw & check('\n')
+    declaration_line = iw >> track(RefExP.expression) << iw
+    empty_line = iw << check('\n') > BlankLine.interpret
     valid_line = longest(empty_line, declaration_line, rule_line)
     rule_lines = repsep2(valid_line, '\n', reset=True, min=1)
-    machine_file = rule_lines
-
-
-def parse_machine_file(path: str) -> SeparatedList(str | DeclarationExpression | RuleExpression | TrackedValue):
-    with open(path) as f:
-        content = f.read()
-
-    result = MachineDefinitionExpressionParsers.machine_file.parse(content)
-    assert isinstance(result, Success)
-    return result.value
+    machine_file = rule_lines > MachineFile

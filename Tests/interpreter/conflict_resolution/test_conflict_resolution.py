@@ -7,7 +7,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import compress_conflict_list, identify_conflicts, resolve_conflicts, \
     RuleConflict
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.interpreter.rule_evaluation import create_rule_interpreter
 from mpl.lib import fs
 
@@ -48,17 +48,17 @@ def get_interpretations(rule_inputs, context):
 
 
 full_context = {
-    Reference('A'): MPLEntity(1, 'A', MPLEntityClass.STATE, fs(1)),
-    Reference('B'): MPLEntity(1, 'B', MPLEntityClass.STATE, fs(2)),
-    Reference('C'): MPLEntity(1, 'C', MPLEntityClass.STATE, fs(3)),
-    Reference('D'): MPLEntity(1, 'D', MPLEntityClass.STATE, fs(4)),
-    Reference('One'): MPLEntity(1, 'One', MPLEntityClass.STATE, fs(5)),
-    Reference('Two'): MPLEntity(1, 'Two', MPLEntityClass.STATE, fs(6)),
-    Reference('Three'): MPLEntity(1, 'Three', MPLEntityClass.STATE, fs(7)),
-    Reference('Four'): MPLEntity(1, 'Four', MPLEntityClass.STATE, fs(8)),
-    Reference('Five'): MPLEntity(1, 'Five', MPLEntityClass.STATE, fs(9)),
-    Reference('Six'): MPLEntity(1, 'Six', MPLEntityClass.STATE, fs(10)),
-    Reference('Seven'): MPLEntity(1, 'Seven', MPLEntityClass.STATE, fs(11)),
+    Reference('A'): MPLEntity('A', fs(1)),
+    Reference('B'): MPLEntity('B', fs(2)),
+    Reference('C'): MPLEntity('C', fs(3)),
+    Reference('D'): MPLEntity('D', fs(4)),
+    Reference('One'): MPLEntity('One', fs(5)),
+    Reference('Two'): MPLEntity('Two', fs(6)),
+    Reference('Three'): MPLEntity('Three', fs(7)),
+    Reference('Four'): MPLEntity('Four', fs(8)),
+    Reference('Five'): MPLEntity('Five', fs(9)),
+    Reference('Six'): MPLEntity('Six', fs(10)),
+    Reference('Seven'): MPLEntity('Seven', fs(11)),
 }
 
 """

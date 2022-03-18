@@ -65,7 +65,7 @@ class CheckParser(Generic[Input, Output], Parser[Input, Input]):
         return self.name_or_nothing() + 'check({})'.format(repr(self.parser))
 
 
-def check(parser: Parser[Input, Output]) -> ExcludingParser:
+def check(parser: Parser[Input, Output] | str) -> ExcludingParser:
     """Evaluates to see if you're on the right track without consuming input
 
     This will match text against the provided parser, and continue if that parser can move forward, else it will backtrack

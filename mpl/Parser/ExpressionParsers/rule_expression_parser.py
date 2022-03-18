@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 from itertools import zip_longest
-from typing import Tuple
+from typing import Tuple, FrozenSet, Optional
 
-from parsita import TextParsers, longest, pred, opt
+from parsita import TextParsers, longest, opt
 
+from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers as AsExP, \
     AssignmentExpression
-from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, Reference
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressionParsers as ScExP, \
     ScenarioExpression
-from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers as LExP
-from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers as QExP
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator, MPLOperatorParsers as MOPs
 from mpl.lib.parsers.additive_parsers import track
 from mpl.lib.parsers.custom_parsers import back
@@ -18,19 +18,10 @@ from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
 
 
 @dataclass(frozen=True, order=True)
-class RuleClause:
-    type: str
-    expression: QueryExpression | AssignmentExpression | ScenarioExpression | TriggerExpression
-
-    def __str__(self):
-        return str(self.expression)
-
-
-
-@dataclass(frozen=True, order=True)
-class RuleExpression:
-    clauses: Tuple[RuleClause, ...]
+class RuleExpression(Expression):
+    clauses: Tuple[QueryExpression | AssignmentExpression | ScenarioExpression, ...]
     operators: Tuple[MPLOperator, ...]
+    parent: Optional[ReferenceExpression] = None
 
     def __str__(self):
         result = ''
@@ -38,43 +29,48 @@ class RuleExpression:
             operator_str = ''
             if operator:
                 operator_str = f' {operator} '
-            clause_str = str(clause.expression)
+            clause_str = str(clause)
             result += f'{clause_str}{operator_str}'
+        if self.parent:
+            result += f' in {self.parent}'
         return result
 
+    def __repr__(self):
+        return f'RuleExpression({self.clauses}, {self.operators})'
 
+    @staticmethod
+    def interpret(parser_results: SeparatedList) -> 'RuleExpression':
+        operands = tuple(parser_results.__iter__())
+        operators = parser_results.separators
 
-def to_clause(clause_type):
-    def result_func(parser_output):
-        return RuleClause(clause_type, parser_output)
-    return result_func
+        result = RuleExpression(operands, operators)
+        return result
 
+    def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'RuleExpression':
+        clauses = tuple(clause.qualify(context, ignore_types) for clause in self.clauses)
+        return RuleExpression(
+            clauses=clauses,
+            operators=self.operators
+        )
 
-def interpret_simple_expression(parser_results: SeparatedList) -> RuleExpression:
-    operands = tuple(parser_results.__iter__())
-    operators = parser_results.separators
-
-    result = RuleExpression(operands, operators)
-    return result
-
-
-def is_scenario_compatible(parser_result):
-    if not parser_result:
-        return True
-    return parser_result[0].RHType == 'STATE'
+    @property
+    def reference_expressions(self) -> FrozenSet[ReferenceExpression]:
+        result = frozenset()
+        for clause in self.clauses:
+            result |= clause.reference_expressions
+        return result
 
 
 class RuleExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 
-    query_clause = LExP.expression > to_clause('query')
+    query_clause = QExP.expression
 
     prior_operator = opt(back(MOPs.operator))
 
-    scenario_clause = pred(prior_operator, is_scenario_compatible, 'is_scenario_compatible') \
-                      >> ScExP.expression > to_clause('scenario')
+    scenario_clause = ScExP.expression
 
-    action_clause = opt(back(MOPs.action_operator)) >> AsExP.expression > to_clause('action')
+    action_clause = opt(back(MOPs.action_operator)) >> AsExP.expression
 
     any_clause = track(longest(action_clause, scenario_clause, query_clause))
 
-    expression = repsep2(any_clause, MOPs.operator, min=1) > interpret_simple_expression
+    expression = repsep2(any_clause, MOPs.operator, min=1) > RuleExpression.interpret

@@ -1,5 +1,5 @@
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from sympy import abc, N, symbols
 
 from mpl.lib import fs
@@ -16,10 +16,10 @@ context = {
     Reference('a'): 5,
     Reference('b'): 'test',
     Reference('state one'):
-        MPLEntity(0, 'state one', MPLEntityClass.MACHINE, fs(5, -8.0, 'test')),
-    Reference('bank'): MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * red + 5 * black)),
+        MPLEntity('state one', fs(5, -8.0, 'test')),
+    Reference('bank'): MPLEntity('bank', fs(3 * red + 5 * black)),
     Reference('cost'): 2 * red + 3 * uncolored,
-    Reference('notactive'): MPLEntity(1, 'notactive', MPLEntityClass.VARIABLE, fs()),
+    Reference('notactive'): MPLEntity('notactive', fs()),
 
 }
 
@@ -128,9 +128,9 @@ def test_logical_xor():
 
 
 def test_target_and():
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
+    cost = MPLEntity('cost', fs(cost_expr))
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -145,10 +145,10 @@ def test_target_and():
 
 
 def test_target_or():
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
-    empty = MPLEntity(1, 'empty', MPLEntityClass.VARIABLE, fs())
+    cost = MPLEntity('cost', fs(cost_expr))
+    empty = MPLEntity('empty', fs())
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -166,11 +166,11 @@ def test_target_or():
 
 
 def test_target_xor():
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
-    empty = MPLEntity(1, 'empty', MPLEntityClass.VARIABLE, fs())
-    empty_2 = MPLEntity(1, 'empty', MPLEntityClass.VARIABLE, fs())
+    cost = MPLEntity('cost', fs(cost_expr))
+    empty = MPLEntity('empty', fs())
+    empty_2 = MPLEntity('empty', fs())
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -198,9 +198,9 @@ def test_target_xor():
 
 def test_logical_gt():
 
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
+    cost = MPLEntity('cost', fs(cost_expr))
 
     expectations = {
         (fs(abc.d), fs()): fs(abc.d),
@@ -223,8 +223,8 @@ def test_logical_gt():
 
 def test_logical_eq():
     cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(cost_expr))
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
+    bank = MPLEntity('bank', fs(cost_expr))
+    cost = MPLEntity('cost', fs(cost_expr))
 
     expectations = {
         (fs(bank), fs(cost)): fs(bank, cost),
@@ -242,8 +242,8 @@ def test_logical_eq():
 
 def test_logical_neq():
     cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(cost_expr))
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
+    bank = MPLEntity('bank', fs(cost_expr))
+    cost = MPLEntity('cost', fs(cost_expr))
 
     expectations = {
         (fs(12, 20), fs(12, 20, 6)): fs(6),
@@ -261,9 +261,9 @@ def test_logical_neq():
 
 def test_logical_inequality_comparisons():
 
-    bank = MPLEntity(1, 'bank', MPLEntityClass.VARIABLE, fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity(1, 'cost', MPLEntityClass.VARIABLE, fs(cost_expr))
+    cost = MPLEntity('cost', fs(cost_expr))
 
     expectations = {
         (fs(), fs(abc.d)): {

@@ -4,13 +4,13 @@ Wumpus: machine
         Hurt
         Dead
 
-    * ~> Ok
+    * ~> Health.Ok
 
-    Hurt & <Turn Ended> ~@ Turns Wounded += 1
-    Ok & <Turn Ended> ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
+    Health.Hurt & <Turn Ended> ~@ Turns Wounded += 1
+    Health.Ok & <Turn Ended> ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
 
-    <Stab> ~> Ok -> Hurt
-    <Stab> ~> Hurt -> Dead
+    <Stab> ~> Health.Ok -> Health.Hurt
+    <Stab> ~> Health.Hurt -> Health.Dead
 
     Activity: state
         Wander
@@ -19,9 +19,9 @@ Wumpus: machine
         Flee
         Recover
 
-    Recover ~> Hurt -> Ok
+    Activity.Recover ~> Health.Hurt -> Health.Ok
 
-    * ~> Wander
+    * ~> Activity.Wander
 
     Mindset: machine
         Smell Prey: state
@@ -31,18 +31,22 @@ Wumpus: machine
         Distance To Prey < Smell Range -> Smell Prey
         Distance To Prey > Smell Range -> Smell Prey -> *
 
-        * & Ok ~> Feel Secure
+        Smell Prey & Feel Secure ~> Wander -> Hunt
+        Smell Prey & !Feel Secure ~> Wander -> Flee
 
-        Hurt ~> Feel Secure -> %{Turns Wounded} -> *
-        Hurt ~> Feel Secure -> %{10} -> Feel Secure
+        <Enter Strike Zone> ~> Mindset.Near Prey
+        <Exit Strike Zone> ~> Mindset.Near Prey -> *
 
-        <Enter Strike Zone> ~> Near Prey
-        <Exit Strike Zone> ~> Near Prey -> *
+    Mindset.* & Health.Ok ~> Mindset.Feel Secure
 
-    Smell Prey & Feel Secure ~> Wander -> Hunt
-    Smell Prey & !Feel Secure ~> Wander -> Flee
+    Health.Hurt ~> Mindset.Feel Secure -> %{Turns Wounded} -> *
+    Health.Hurt ~> Mindset.Feel Secure -> %{10} -> Mindset.Feel Secure
+
+
+
+
 
     Near Prey & Feel Secure ~> Hunt -> Attack
     Near Prey & !Feel Secure ~> Attack -> Flee
 
-    !Feel Secure & !Smell Prey & Hurt ~> Flee -> Recover
+    !Feel Secure & !Smell Prey & Health.Hurt ~> Flee -> Recover

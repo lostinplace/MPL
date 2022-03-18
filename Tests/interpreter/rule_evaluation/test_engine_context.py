@@ -1,8 +1,9 @@
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleClause, RuleExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.lib import fs
 
 
@@ -12,23 +13,23 @@ def test_context_generation_from_expressions():
 
     expectations = {
         'a & b | c + 3': {
-            Ref('a'): MPLEntity(hash(Ref('a')), 'a', MPLEntityClass.STATE, frozenset()),
-            Ref('b'): MPLEntity(hash(Ref('b')), 'b', MPLEntityClass.STATE, frozenset()),
-            Ref('c'): MPLEntity(hash(Ref('c')), 'c', MPLEntityClass.STATE, frozenset()),
+            Ref('a'): MPLEntity('a', frozenset()),
+            Ref('b'): MPLEntity('b', frozenset()),
+            Ref('c'): MPLEntity('c', frozenset()),
         },
         'test = b + 3 & `bart`': {
-            Ref('test'): MPLEntity(hash(Ref('test')), 'test', MPLEntityClass.STATE, frozenset()),
-            Ref('b'): MPLEntity(hash(Ref('b')), 'b', MPLEntityClass.STATE, frozenset()),
+            Ref('test'): MPLEntity('test', frozenset()),
+            Ref('b'): MPLEntity('b', frozenset()),
         },
         '%{a & b}': {
-            Ref('a'): MPLEntity(hash(Ref('a')), 'a', MPLEntityClass.STATE, frozenset()),
-            Ref('b'): MPLEntity(hash(Ref('b')), 'b', MPLEntityClass.STATE, frozenset()),
+            Ref('a'): MPLEntity('a', frozenset()),
+            Ref('b'): MPLEntity('b', frozenset()),
         },
     }
 
     for expr_input, expected in expectations.items():
-        clause = quick_parse(RuleClause, expr_input)
-        expression = clause.expression
+        rule = quick_parse(RuleExpression, expr_input)
+        expression = rule.clauses[0]
         interpreter = ExpressionInterpreter.from_expression(expression)
         references = interpreter.references
         actual = EngineContext.from_references(references)
@@ -41,10 +42,10 @@ def test_context_generation_from_rules():
 
     expectations = {
         'a & b -> c -> d': {
-            Ref('a'): MPLEntity(hash(Ref('a')), 'a', MPLEntityClass.STATE, frozenset()),
-            Ref('b'): MPLEntity(hash(Ref('b')), 'b', MPLEntityClass.STATE, frozenset()),
-            Ref('c'): MPLEntity(hash(Ref('c')), 'c', MPLEntityClass.STATE, frozenset()),
-            Ref('d'): MPLEntity(hash(Ref('d')), 'd', MPLEntityClass.STATE, frozenset()),
+            Ref('a'): MPLEntity('a', frozenset()),
+            Ref('b'): MPLEntity('b', frozenset()),
+            Ref('c'): MPLEntity('c', frozenset()),
+            Ref('d'): MPLEntity('d', frozenset()),
         },
     }
 
@@ -60,36 +61,34 @@ def test_context_activation():
 
     expectations = {
         ('test  & something complex ^ `with a string` + ok', fs('test', 'something complex'), None): {
-            Ref('test'): MPLEntity(hash(Ref('test')), 'test', MPLEntityClass.STATE, frozenset([hash(Ref('test'))])),
+            Ref('test'): MPLEntity('test', frozenset([hash(Ref('test'))])),
             Ref('something complex'):
                 MPLEntity(
-                    hash(Ref('something complex')),
                     'something complex',
-                    MPLEntityClass.STATE, frozenset([hash(Ref('something complex'))])
+                    frozenset([hash(Ref('something complex'))])
                 ),
-            Ref('ok'): MPLEntity(hash(Ref('ok')), 'ok', MPLEntityClass.STATE, frozenset()),
+            Ref('ok'): MPLEntity('ok', frozenset()),
         },
         ('a & b', 'a', None): {
-            Ref('a'): MPLEntity(hash(Ref('a')), 'a', MPLEntityClass.STATE, frozenset([hash(Ref('a'))])),
-            Ref('b'): MPLEntity(hash(Ref('b')), 'b', MPLEntityClass.STATE, frozenset()),
+            Ref('a'): MPLEntity('a', frozenset([hash(Ref('a'))])),
+            Ref('b'): MPLEntity('b', frozenset()),
         },
         ('test  & something ^ not me', Ref('test'), None): {
-            Ref('test'): MPLEntity(hash(Ref('test')), 'test', MPLEntityClass.STATE, frozenset([hash(Ref('test'))])),
-            Ref('something'): MPLEntity(hash(Ref('something')), 'something', MPLEntityClass.STATE, frozenset()),
-            Ref('not me'): MPLEntity(hash(Ref('not me')), 'not me', MPLEntityClass.STATE, frozenset()),
+            Ref('test'): MPLEntity('test', frozenset([hash(Ref('test'))])),
+            Ref('something'): MPLEntity('something', frozenset()),
+            Ref('not me'): MPLEntity('not me', frozenset()),
         },
         ('test  & something ^ not me | complicated', fs(Ref('test'), 'complicated'), 'ok'): {
-            Ref('test'): MPLEntity(hash(Ref('test')), 'test', MPLEntityClass.STATE, fs('ok')),
-            Ref('something'): MPLEntity(hash(Ref('something')), 'something', MPLEntityClass.STATE, frozenset()),
-            Ref('not me'): MPLEntity(hash(Ref('not me')), 'not me', MPLEntityClass.STATE, frozenset()),
-            Ref('complicated'): MPLEntity(hash(Ref('complicated')), 'complicated', MPLEntityClass.STATE, fs('ok')),
+            Ref('test'): MPLEntity('test', fs('ok')),
+            Ref('something'): MPLEntity('something', frozenset()),
+            Ref('not me'): MPLEntity('not me', frozenset()),
+            Ref('complicated'): MPLEntity('complicated', fs('ok')),
         },
     }
 
     for (expr_input, ref_input, ref_value), expected in expectations.items():
 
-        clause = quick_parse(RuleClause, expr_input)
-        expression = clause.expression
+        expression = quick_parse(QueryExpression, expr_input)
         interpreter = ExpressionInterpreter.from_expression(expression)
         references = interpreter.references
         context = EngineContext.from_references(references)

@@ -5,7 +5,7 @@ from typing import FrozenSet, Union, Dict, Set
 from sympy import Expr, symbols, Symbol
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 
 
 MPLContext = Dict[Reference, Union[Number, str, Expr, MPLEntity]]
@@ -116,6 +116,42 @@ def target_or(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
     if in_y:
         return in_y
 
+    return false_result
+
+
+def query_gt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 > op2:
+        return op1
+    return false_result
+
+
+def query_lt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 < op2:
+        return op1
+    return false_result
+
+
+def query_ge(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 >= op2:
+        return op1
+    return false_result
+
+
+def query_le(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 <= op2:
+        return op1
+    return false_result
+
+
+def query_eq(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 == op2:
+        return op1
+    return false_result
+
+
+def query_ne(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+    if op1 != op2:
+        return op2
     return false_result
 
 

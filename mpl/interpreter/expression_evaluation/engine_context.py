@@ -1,12 +1,13 @@
 import dataclasses
 from collections import UserDict
-from typing import FrozenSet, Dict, Union, Set, Tuple
+from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
 
+from networkx import MultiDiGraph
 from sympy import Expr
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity, MPLEntityClass
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretation
 
 ref_name = Union[str, Ref]
@@ -27,6 +28,11 @@ class EngineContext(UserDict):
         return frozenset(ref.name for ref in self)
 
     @staticmethod
+    def from_graph(graph: MultiDiGraph) -> 'EngineContext':
+        references = frozenset({x for x in graph.nodes if isinstance(x, Reference)})
+        return EngineContext.from_references(references)
+
+    @staticmethod
     def from_references(references: FrozenSet[Reference]) -> 'EngineContext':
         result = EngineContext()
         for ref in references:
@@ -35,7 +41,7 @@ class EngineContext(UserDict):
             result.hash_refs[ref_hash] = ref
             # TODO: this doesn't differentiate between different types of entities, e.g. triggers.
             #  Figure out how these should be handled in the  reference graph and update it here.
-            entity = MPLEntity(ref_hash, ref.name, MPLEntityClass.STATE, frozenset())
+            entity = MPLEntity(ref.name, frozenset())
             result[ref] = entity
         return result
 
@@ -98,5 +104,6 @@ class EngineContext(UserDict):
 
     def get_diff(self, other: 'EngineContext') -> context_diff:
         return EngineContext.diff(self, other)
+
 
 

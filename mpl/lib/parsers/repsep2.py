@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Generic, Sequence, Optional, Union, Any, Tuple
+from typing import Generic, Sequence, Optional, Union, Any, Tuple, TypeVar
 
 from parsita import Parser, Reader, StringReader, lit
 from parsita.state import Input, Output, Continue, Backtrack
@@ -134,8 +134,10 @@ def repsep2(
 #             out.append(hash(i))
 #     return tuple(out)
 
+T = TypeVar('T')
 
-class SeparatedList(tuple):
+
+class SeparatedList(tuple, Generic[T]):
     separators: Tuple[Any] = None
 
     # def __hash__(self):

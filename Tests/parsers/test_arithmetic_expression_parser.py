@@ -2,7 +2,7 @@ from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import Arithmetic
 from mpl.Parser.Tokenizers.operator_tokenizers import ArithmeticOperator
 
 from mpl.Parser.Tokenizers.simple_value_tokenizer import NumberToken
-from Tests import collect_parsing_expectations, qre
+from Tests import collect_parsing_expectations, quick_reference_expression
 
 
 def test_simple_expression_parsers():
@@ -83,7 +83,7 @@ def test_simple_expression_parsers_with_references():
             (
                 NumberToken("1"),
                 ArithmeticExpression(
-                    (qre("test"), NumberToken("3")),
+                    (quick_reference_expression("test"), NumberToken("3")),
                     (ArithmeticOperator("-"),)
                 ),
                 NumberToken("4")

@@ -70,6 +70,6 @@ class SimpleValueTokenizers(TextParsers, whitespace=r'[ \t]*'):
 
     string_token = '`' >> reg(r"""[^`]+""") << '`' > to(StringToken)
 
-    reference_token = reg(r"""[\w ]+""") >= to_reference_token
+    reference_token = reg(r"""[\w][\w\d ]*""") >= to_reference_token
 
     token = longest(number_token, string_token, reference_token)

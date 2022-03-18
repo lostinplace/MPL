@@ -11,23 +11,14 @@ from prompt_toolkit.validation import Validator
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.interpreter.rule_evaluation import RuleInterpreter
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.runtime.cli.command_parser import CommandParsers, SystemCommand, TickCommand, ExploreCommand, QueryCommand, \
     ActivateCommand, LoadCommand
-
-completion_dict = ({
-    'help': None,
-    'quit': None,
-    'explore': None,
-})
-
-
-
 
 
 def is_valid_command(text):
@@ -65,6 +56,7 @@ def get_help() -> str:
     .{n}                increments the state of the engine n times then prints the active references
     +{name}	            activates the named reference
     +{name}={value}	    activates the named reference with the provided value
+    -{name}	            deactivates the named reference
     explore {n}	        conducts an exploration of n iterations and prints the distribution of outcomes
     ?                   prints the current engine context
     ?{name}             prints the state of the named reference
@@ -126,13 +118,12 @@ def execute_command(engine: MPLEngine, command: str):
             expressions = {x.name for x in engine.rule_interpreters}
             return expressions
         case RuleExpression():
-            engine.add(value)
-            return value
-        case LoadCommand():
-            expressions = value.load()
-            engine.add(expressions)
-            result = {str(x) for x in expressions}
+            interpreter = RuleInterpreter.from_expression(value)
+            result = engine.execute_interpreters({interpreter})
             return result
+        case LoadCommand():
+            engine = value.load()
+            return engine.graph.edges()
         case TickCommand():
             start_context = engine.context
             engine.tick(value.number)
@@ -151,7 +142,7 @@ def execute_command(engine: MPLEngine, command: str):
                     result = engine.context
                     return result
         case ActivateCommand() as activate_command:
-            re = RuleExpression((RuleClause('assign', activate_command.expression),), tuple())
+            re = RuleExpression((activate_command.expression,), tuple())
             interpreter = RuleInterpreter.from_expression(re)
             rule_context = EngineContext.from_interpreter(interpreter)
             engine.context = rule_context | engine.context
@@ -166,6 +157,12 @@ def run_interactive_session():
     history_path = f'{os.path.expanduser("~")}/.mplsh_history'
     our_history = FileHistory(history_path)
     session = PromptSession(history=our_history)
+    completion_dict = {
+        'help': None,
+        'quit': None,
+        'explore': None,
+    }
+
     prompt_kwargs = {
         'auto_suggest': AutoSuggestFromHistory(),
         'validator': validator,
@@ -179,8 +176,13 @@ def run_interactive_session():
         Toolbar.active_refs = len(engine.context.active)
         Toolbar.active_rules = len(engine.rule_interpreters)
         ref_names = set(engine.context.ref_names)
-        completion_dict['+'] = ref_names
-        completion_dict['?'] = ref_names
+        adjustments = {
+            '+': ref_names,
+            '-': ref_names,
+            '?': ref_names,
+        }
+
+        completion_dict |= adjustments
         completer = NestedCompleter.from_nested_dict(completion_dict)
         prompt_kwargs['completer'] = completer
         command = session.prompt('>  ', **prompt_kwargs)

@@ -7,13 +7,13 @@ from numbers import Number
 from typing import Tuple, FrozenSet, Optional
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleClause
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
 from mpl.interpreter.expression_evaluation.interpreters import AssignmentResult, create_expression_interpreter, \
     QueryResult, ScenarioResult, TargetResult
 from mpl.interpreter.expression_evaluation.types import QueryLedgerRef, ChangeLedgerRef
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntityClass, MPLEntity
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.lib import fs
 from mpl.lib.query_logic import MPL_Context, FinalResultSet
 
@@ -24,7 +24,7 @@ empty_set = frozenset()
 
 
 def clear_entity_values(context: MPL_Context, values: FinalResultSet) -> MPL_Context:
-    entities = [x for x in values if isinstance(x, MPLEntity) and x.entity_class & MPLEntityClass.CLEARED_BY_CONSUMPTION]
+    entities = [x for x in values if isinstance(x, MPLEntity)]
     new_vals = dict()
     change_ledger = context.get(ChangeLedgerRef) or dict()
     for k, v in context.items():
@@ -120,7 +120,7 @@ class RuleInterpreter:
     name: Optional[str] = None
     expression: Optional[RuleExpression] = None
 
-    def interpret(self, context: MPL_Context) -> RuleInterpretation:
+    def interpret(self, context: MPL_Context | 'EngineContext') -> RuleInterpretation:
         this_name = self.name or ''
         result_context = context | {QueryLedgerRef: tuple()}
         operation_pairs = zip_longest(self.expression_interpreters, self.operators)
@@ -182,10 +182,6 @@ class RuleInterpreter:
         return create_rule_interpreter(expression)
 
 
-def rule_clause_to_expression_interpreter(clause: RuleClause, target=False) -> ExpressionInterpreter:
-    return create_expression_interpreter(clause.expression, target)
-
-
 def create_rule_interpreter(rule: RuleExpression) -> RuleInterpreter:
     """
     Create a rule interpreter for a rule.
@@ -196,9 +192,9 @@ def create_rule_interpreter(rule: RuleExpression) -> RuleInterpreter:
     for clause, operator in zip_longest(rule.clauses, rule.operators):
         match clause, operator:
             case x, None:
-                interpreter = rule_clause_to_expression_interpreter(x, True)
+                interpreter = create_expression_interpreter(x, True)
             case x, __:
-                interpreter = rule_clause_to_expression_interpreter(x)
+                interpreter = create_expression_interpreter(x)
         interpreters.append(interpreter)
 
     return RuleInterpreter(tuple(interpreters), rule.operators, str(rule), rule)

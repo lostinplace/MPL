@@ -8,28 +8,24 @@ Reference Expressions can be presented with or without parent types and any dept
 
 REFERENCE_EXPRESSION = REFERENCE_TOKEN (: REFERENCE_EXPRESSION)?
 """
+import dataclasses
 import re
 import os
 
 from sympy import Symbol, symbols
 from dataclasses import dataclass
-from typing import Optional, Tuple, Iterable, Union
+from typing import Optional, Tuple, Iterable, Union, List, FrozenSet, Dict
 
-from parsita import TextParsers, opt
+from parsita import TextParsers, opt, repsep, Success, lit, longest
 from parsita.util import splat
 
 from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers as svt, ReferenceToken
-from mpl.lib.parsers.repsep2 import repsep2
-
-
-def to(target_type):
-    def result_func(parser_output):
-        return target_type(parser_output)
-    return result_func
+from mpl.lib import fs
 
 
 def sanitize_reference_name(name: str) -> str:
     return re.sub(r'\s', '\u2e31', name)
+
 
 def unsanitize_reference_name(name: str) -> str:
     return re.sub('\u2e31', r' ', name)
@@ -43,16 +39,45 @@ ref_symbol_pattern = re.compile(pattern)
 @dataclass(frozen=True, order=True)
 class Reference:
     name: str
-    type: Optional[str] = None
+    types: Optional[FrozenSet[str]] = None
 
     def stringify(self):
         result = f'{self.name}'
-        if self.type:
-            result += f': {self.type}'
+        if self.types:
+            result += f': {self.types}'
         return result
 
+    @property
+    def types_str(self):
+        match self.types:
+            case str():
+                return self.types
+            case tuple() | frozenset():
+                return ','.join(self.types)
+            case None:
+                return ''
+            case _:
+                return ''
+
+    @property
+    def as_type_dict(self) -> Dict[str, 'Reference']:
+        result = {None: dataclasses.replace(self, types=None)}
+        if self.types:
+            for t in self.types:
+                result[t] = dataclasses.replace(self, types=frozenset({t}))
+        return result
+
+    def __str__(self):
+        types_str = self.types_str
+        if types_str:
+            return f'{self.name}: {types_str}'
+        return self.name
+
+    def __repr__(self):
+        return f'Reference({self})'
+
     def sanitize(self) -> 'Reference':
-        return Reference(sanitize_reference_name(self.name), self.type)
+        return Reference(sanitize_reference_name(self.name), self.types)
 
     def as_symbol(self) -> Symbol:
         name = sanitize_reference_name(self.name)
@@ -65,6 +90,10 @@ class Reference:
             refname = result.groupdict()['refname']
             return Reference(unsanitize_reference_name(refname))
         return symbol
+
+    @property
+    def without_types(self) -> 'Reference':
+        return dataclasses.replace(self, types=None)
 
     @property
     def id(self):
@@ -105,58 +134,74 @@ Ref = Reference
 
 
 @dataclass(frozen=True, order=True)
-class DeclarationExpression:
-    name: str
-    type: str
-    reference: Reference
-
-
-@dataclass(frozen=True, order=True)
 class ReferenceExpression:
-    value: Reference
-    lineage: Tuple[Reference]
+    path: Tuple[str, ...]
+    types: Optional[FrozenSet[str]] = None
+    parent: Optional['ReferenceExpression'] = None
+
+    @property
+    def reference(self) -> Reference:
+        name = '.'.join(self.path)
+        return Reference(name, self.types)
 
     def __str__(self):
-        if self.value.name == 'void':
-            return '*'
+        result = ''
+        if self.path[-1:] == ('void',):
+            result = '.'.join(self.path[:-1] + ('*',))
+        else:
+            result = str(self.reference)
+        if self.parent:
+            result = f'{result} in {self.parent}'
+        return result
 
-        lineage_str = '.'.join(ref.name for ref in self.lineage)
-        lineage_str = lineage_str + '.' if lineage_str else ''
-        return f"{lineage_str}{self.value.stringify()}"
+    def __repr__(self):
+        return f"ReferenceExpression({self})"
+
+    @staticmethod
+    def interpret(path: List[ReferenceToken], types: List[List[ReferenceToken]]) -> 'ReferenceExpression':
+        new_types = frozenset(type.content for type in types[0]) if types else None
+        new_path = tuple(pathitem.content for pathitem in path)
+        return ReferenceExpression(new_path, new_types)
+
+    @staticmethod
+    def void(prefix) -> 'ReferenceExpression':
+        if prefix:
+            as_strings = tuple(str(x) for x in prefix[0])
+            return ReferenceExpression(as_strings + ('void',), None)
+        return ReferenceExpression(('void',))
+
+    def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
+        return ReferenceExpression(context + self.path, self.types if not ignore_types else frozenset())
+
+    @property
+    def reference_expressions(self) -> FrozenSet['ReferenceExpression']:
+        return frozenset({self})
 
 
-def to_reference(reference: ReferenceToken, type):
-    if type:
-        type_name = type[0].content
-        return Reference(reference.content, type_name)
-    return Reference(reference.content, None)
-
-
-def to_declaration(ref: Reference):
-    return DeclarationExpression(ref.name, ref.type, ref)
-
-
-def interpret_reference_expression(results):
-    if isinstance(results, Iterable):
-        tmp = tuple(reversed(results))
-        main_ref = tmp[0]
-        lineage = tuple(tmp[1:])
-        return ReferenceExpression(main_ref, lineage)
-    else:
-        return ReferenceExpression(results, tuple())
 
 
 class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
-    type_reference = svt.reference_token
+    type_reference = lit(':') >> repsep(svt.reference_token, ',', min=1)
 
-    simple_reference = svt.reference_token & opt(':' >> type_reference) > splat(to_reference)
+    void_expression = opt(repsep(svt.reference_token, '.', min=1) << '.') << lit('*') > ReferenceExpression.void
 
-    pathed_reference = '//' >> repsep2(simple_reference, '/', min=1)
+    reference_expression = repsep(svt.reference_token, '.', min=1) & opt(type_reference) \
+                           > splat(ReferenceExpression.interpret)
 
-    simple_expression = simple_reference > interpret_reference_expression
+    expression = longest(void_expression, reference_expression)
 
-    pathed_expression = pathed_reference > interpret_reference_expression
 
-    declaration_expression = simple_reference > to_declaration
+def test_reference_expression_parsing():
 
-    expression = pathed_expression | simple_expression
+    expectations = {
+        'test me': Reference('test me', None),
+        'base.test me': Reference('base.test me', None),
+        'base.test me:int': Reference('base.test me', fs('int')),
+    }
+
+    for input, expected in expectations.items():
+        result = ReferenceExpressionParsers.expression.parse(input)
+        assert isinstance(result, Success)
+        expression = result.value
+        actual = expression.reference
+        assert actual == expected, input

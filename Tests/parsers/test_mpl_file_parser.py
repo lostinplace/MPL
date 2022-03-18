@@ -1,7 +1,7 @@
-from mpl.Parser.ExpressionParsers.machine_expression_parser import parse_machine_file
+from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 
 
-def test_mpl_file_parser():
-    result = parse_machine_file('Tests/test_files/simple_wumpus.mpl')
+def test_mpl_file_parser_doesnt_fail():
+    result = MachineFile.from_file('Tests/test_files/simple_wumpus.mpl')
 
     assert result

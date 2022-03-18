@@ -1,37 +1,36 @@
+from parsita import Success
+
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
     Reference
 from Tests import collect_parsing_expectations
+from mpl.lib import fs
 
 
 def test_reference_expression_parsers():
     expectations = {
         "a": ReferenceExpression(
-            Reference('a', None),
-            ()
+            ('a',),
+            None
         ),
         "a:test": ReferenceExpression(
-            Reference('a', "test"),
-            ()
+            ('a',),
+            fs('test')
         ),
         "Wumpus: machine": ReferenceExpression(
-            Reference('Wumpus', "machine"),
-            ()
+            ('Wumpus',),
+            fs('machine')
         ),
         "Ok: Health": ReferenceExpression(
-            Reference('Ok', "Health"),
-            ()
+            ('Ok',),
+            fs('Health')
         ),
-        "//Health:state/Ok/Treatment:state": ReferenceExpression(
-            Reference('Treatment', "state"),
-            (
-                Reference('Ok', None),
-                Reference('Health', "state"),
-            )
+        "Health.Ok.Treatment:state": ReferenceExpression(
+            ('Health', 'Ok', 'Treatment'),
+            fs('state')
         ),
     }
 
-    for result in collect_parsing_expectations(expectations, ReferenceExpressionParsers.expression):
-        result = result.as_strings()
-        assert result.actual == result.expected
-
+    for expression, expected in expectations.items():
+        actual = ReferenceExpressionParsers.expression.parse(expression)
+        assert actual == Success(expected), expression
 

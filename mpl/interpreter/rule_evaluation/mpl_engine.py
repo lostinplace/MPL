@@ -1,11 +1,15 @@
 from dataclasses import dataclass
-from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, List, Generator
+from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, List, Generator, Optional
 
+from networkx import MultiDiGraph
+
+from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation
 from mpl.lib import fs
 
@@ -15,6 +19,17 @@ class MPLEngine:
     rule_interpreters: Set[RuleInterpreter] = frozenset()
     context: EngineContext = EngineContext()
     history: Tuple[context_diff, ...] = ()
+    graph: Optional[MultiDiGraph] = None
+
+    @staticmethod
+    def from_file(file: str | MachineFile) -> 'MPLEngine':
+        if isinstance(file, str):
+            file = MachineFile.from_file(file)
+
+        context, graph = process_machine_file(file)
+        rule_expressions = rule_expressions_from_graph(graph)
+        interpreters = {RuleInterpreter.from_expression(rule) for rule in rule_expressions}
+        return MPLEngine(interpreters, context, (), graph)
 
     def add(self, rules: RuleExpression | Set[RuleExpression]):
         rule: Set[RuleExpression]
@@ -27,6 +42,31 @@ class MPLEngine:
             self.rule_interpreters |= fs(interpreter)
             self.context = new_context
 
+    def execute_expression(self, expression: RuleExpression) -> Dict[str, Tuple[Any, Any]]:
+        original_context = self.context
+        interpreter = RuleInterpreter.from_expression(expression)
+        result = interpreter.interpret(self.context)
+        if result.state != RuleInterpretationState.APPLICABLE:
+            return dict()
+        conflicts = identify_conflicts({result})
+        resolved = resolve_conflicts(conflicts)
+        self.apply(resolved)
+        output = original_context.get_diff(self.context)
+        self.history = (output,) + self.history
+        return output
+
+    def execute_interpreters(self, interpreters: Set[RuleInterpreter]) -> Dict[str, Tuple[Any, Any]]:
+        original_context = self.context
+        interpretations = {interpreter.interpret(self.context) for interpreter in interpreters}
+        applicable = {x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE}
+        if not applicable:
+            return dict()
+        conflicts = identify_conflicts(applicable)
+        resolved = resolve_conflicts(conflicts)
+        self.apply(resolved)
+        output = original_context.get_diff(self.context)
+        return output
+
     def apply(self, interpretations: FrozenSet[RuleInterpretation]):
         original_context = self.context
         new_context = self.context.apply(interpretations)
@@ -38,15 +78,7 @@ class MPLEngine:
         if count > 0:
             #  tick forward
             for tick in range(count):
-                interpretations = set()
-                for rule_interpreter in self.rule_interpreters:
-                    result = rule_interpreter.interpret(self.context)
-                    if result.state == RuleInterpretationState.APPLICABLE:
-                        interpretations.add(result)
-                conflicts = identify_conflicts(interpretations)
-                resolved = resolve_conflicts(conflicts)
-                self.apply(resolved)
-
+                self.execute_interpreters(self.rule_interpreters)
             output = original_context.get_diff(self.context)
             self.history = (output,) + self.history
         elif count < 0:
@@ -97,5 +129,3 @@ class MPLEngine:
     def active(self) -> FrozenSet[Reference]:
         return self.context.active
 
-    def evaluate_rule(self, rule):
-        return self.mpl_interpreter.evaluate_rule(rule)

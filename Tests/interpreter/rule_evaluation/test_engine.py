@@ -63,3 +63,18 @@ def test_basic_operations():
     max = trials / 2 * 1.05
     assert hit_two > min and hit_two < max
 
+
+def test_evaluate_rule_from_wumpus_file():
+    engine = MPLEngine.from_file('Tests/test_files/simple_wumpus.mpl')
+    testing = """Activity.Recover ~> Health.Hurt -> Health.Ok"""
+    tmp = engine.query(Ref('Wumpus.Health.Ok'))
+    assert not tmp
+    tmp = engine.activate(Ref('Wumpus.Health.Hurt'))
+    tmp = engine.activate(Ref('Wumpus.Activity.Recover'))
+    assert tmp
+    assert engine.query(Ref('Wumpus.Health.Hurt'))
+    assert engine.query(Ref('Wumpus.Activity.Recover'))
+    tmp = engine.tick()
+    assert not engine.query(Ref('Wumpus.Health.Hurt'))
+    assert engine.query(Ref('Wumpus.Activity.Recover'))
+    assert engine.query(Ref('Wumpus.Health.Ok'))

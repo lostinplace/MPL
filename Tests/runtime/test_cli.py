@@ -6,7 +6,6 @@ from prompt_toolkit import HTML
 
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
-from mpl.Parser.ExpressionParsers.machine_expression_parser import parse_machine_file
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
@@ -67,6 +66,9 @@ def test_command_sequences():
     ]
 
     expectations = {
+        ('load Tests/test_files/simplest.mpl'): [
+            None
+        ],
         ('state one->state two', '+state one', '.', '.-1'): [
             None,
             {'state one': (fs(), fs(Ref('state one').id))},

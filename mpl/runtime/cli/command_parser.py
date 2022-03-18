@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List, Set, FrozenSet
+from typing import List, Set, FrozenSet, Optional
 
 from parsita import TextParsers, opt, Success, reg, longest, repsep, lit
 
 from mpl.Parser.ExpressionParsers.assignment_expression_parser \
     import AssignmentExpression, AssignmentExpressionParsers as AExpP
-from mpl.Parser.ExpressionParsers.machine_expression_parser import parse_machine_file
+from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser \
     import ReferenceExpression, ReferenceExpressionParsers as RefExP, Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers
+from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.lib import fs
 
 """
@@ -37,9 +38,8 @@ class SystemCommand(Enum):
 class LoadCommand:
     path: str
 
-    def load(self) -> FrozenSet[RuleExpression]:
-        result = parse_machine_file(self.path)
-        return frozenset(result)
+    def load(self) -> MPLEngine:
+        return MPLEngine.from_file(self.path)
 
     @staticmethod
     def interpret(path_components: List[List[str]]) -> 'LoadCommand':
@@ -70,15 +70,15 @@ class ExploreCommand:
 
 @dataclass(frozen=True, order=True)
 class QueryCommand:
-    reference: Reference = None
+    reference: Optional[Reference] = None
 
     @staticmethod
     def interpret(text=[]):
         match text:
             case []:
                 return QueryCommand(None)
-            case [ReferenceExpression()] as ref:
-                return QueryCommand(ref[0].value)
+            case [ReferenceExpression() as x]:
+                return QueryCommand(x.reference)
 
 
 @dataclass(frozen=True, order=True)
@@ -89,7 +89,7 @@ class ActivateCommand:
     def interpret(expression: ReferenceExpression | AssignmentExpression):
         match expression:
             case ReferenceExpression():
-                reference = expression.value
+                reference = expression.reference
                 value = reference.id
                 expr_input = f'{reference.name}={value}'
                 expr = AExpP.expression.parse(expr_input)
@@ -101,6 +101,14 @@ class ActivateCommand:
 
         return ActivateCommand(expression)
 
+    @staticmethod
+    def deactivate(expression: ReferenceExpression):
+        reference = expression.reference
+        expr_input = f'{reference.name}=0'
+        expr = AExpP.expression.parse(expr_input)
+        assert isinstance(expr, Success)
+        return ActivateCommand(expr.value)
+
 
 class CommandParsers(TextParsers):
     filepath = opt('/') & repsep(reg(r'[^/]+'), '/', min=1)
@@ -108,6 +116,8 @@ class CommandParsers(TextParsers):
 
     tick = reg(r'\.') >> opt(reg(r'-?\d+')) > TickCommand.interpret
     assign = '+' >> longest(RefExP.expression, AExpP.expression) > ActivateCommand.interpret
+    deactivate = '-' >> RefExP.expression > ActivateCommand.deactivate
+
     explore = 'explore' >> opt(reg(r'\d+')) > ExploreCommand.interpret
     query = '?' >> opt(RefExP.expression) > QueryCommand.interpret
     quit = reg('quit') > (lambda _: SystemCommand.QUIT)

@@ -15,7 +15,7 @@ from mpl.interpreter.expression_evaluation.operators import OperatorOperation, q
 from mpl.interpreter.expression_evaluation.stack_management import evaluate_symbolized_postfix_stack, \
     symbolize_expression
 from mpl.interpreter.expression_evaluation.types import symbolized_postfix_stack, ChangeLedgerRef, ExpressionResult
-from mpl.interpreter.reference_resolution.reference_graph_resolution import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.lib.query_logic import MPL_Context, FinalResultSet, target_xor, target_and, target_or
 
 
@@ -108,7 +108,7 @@ def create_expression_interpreter(
             return ScenarioExpressionInterpreter(expression, stack)
         case AssignmentExpression():
             operator = query_operations_dict[expression.operator.contents]
-            reference = expression.lhs.value
+            reference = expression.lhs.reference
             match operator.operation_type:
                 case OperationType.Assign:
                     stack = symbolize_expression(expression.rhs)

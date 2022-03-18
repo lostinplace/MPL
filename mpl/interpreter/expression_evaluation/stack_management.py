@@ -32,9 +32,9 @@ def get_postfix_operand(operand, operation_dict: Dict[str, OperatorOperation]):
         case StringToken():
             return operand.content
         case ReferenceExpression():
-            return operand.value
+            return operand.reference.without_types
         case TriggerExpression():
-            return operand.name
+            return operand.name.reference
 
 
 def flat_append(out: List, operand: str | Number | Reference | List):

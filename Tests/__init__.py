@@ -6,11 +6,9 @@ from parsita import Failure, Success
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers
-from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
-    DeclarationExpression
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression, RuleClause
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
-from mpl.Parser.ExpressionParsers.state_expression_parser import StateExpressionParsers, StateExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
 from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, StringToken
 
@@ -72,12 +70,8 @@ def qdae(value):
     return quick_parse(ArithmeticExpression, value)
 
 
-def qre(value):
+def quick_reference_expression(value):
     return quick_parse(ReferenceExpression, value)
-
-
-def qse(value):
-    return quick_parse(StateExpression, value)
 
 
 def qase(value):
@@ -86,16 +80,13 @@ def qase(value):
 
 parser_map ={
     AssignmentExpression: AssignmentExpressionParsers.expression,
-    StateExpression: StateExpressionParsers.expression,
     ReferenceExpression: ReferenceExpressionParsers.expression,
     ArithmeticExpression: ArithmeticExpressionParsers.expression,
     QueryExpression: QueryExpressionParsers.expression,
     TriggerExpression: TriggerExpressionParsers.expression,
     ScenarioExpression: ScenarioExpressionParsers.expression,
     RuleExpression: RuleExpressionParsers.expression,
-    DeclarationExpression: ReferenceExpressionParsers.declaration_expression,
     StringToken: SimpleValueTokenizers.string_token,
-    RuleClause: RuleExpressionParsers.any_clause,
 }
 
 
@@ -105,5 +96,5 @@ T = TypeVar('T')
 def quick_parse(out_type: Generic[T], value: str) -> T:
     parser = parser_map[out_type]
     result = parser.parse(value)
-    assert isinstance(result, Success)
+    assert isinstance(result, Success), f"{value}: {result}"
     return result.value

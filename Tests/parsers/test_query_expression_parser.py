@@ -1,10 +1,12 @@
 from typing import Any
 
+from parsita import Success
+
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, \
     QueryExpressionParsers
 
-from Tests import collect_parsing_expectations, qre, qdae, quick_parse
+from Tests import collect_parsing_expectations, quick_reference_expression as qre, qdae, quick_parse
 from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from mpl.Parser.Tokenizers.operator_tokenizers import QueryOperator, ArithmeticOperator
@@ -21,18 +23,6 @@ def qne(arg: Any):
 def test_query_expression_parser():
 
     expectations = {
-        "!test": qne(qre('test')),
-        "`safe`": QueryExpression(
-            (
-                TextExpression(
-                    (
-                        StringToken("safe"),
-                    ),
-                    ()
-                ),
-            ),
-            ()
-        ),
         "first & !(second ^ third) - 4 * 5 | sixth": QueryExpression(
             (
                 qre('first'),
@@ -45,6 +35,18 @@ def test_query_expression_parser():
                 ArithmeticOperator('-'),
                 QueryOperator('|'),
             )
+        ),
+        "!test": qne(qre('test')),
+        "`safe`": QueryExpression(
+            (
+                TextExpression(
+                    (
+                        StringToken("safe"),
+                    ),
+                    ()
+                ),
+            ),
+            ()
         ),
 
         "first & !second ^ third - 4 * 5 | sixth" : QueryExpression(
@@ -170,7 +172,6 @@ def test_query_expression_parser():
         ),
     }
 
-    results = collect_parsing_expectations(expectations, QueryExpressionParsers.expression)
-    for result in results:
-        result = result.as_strings()
-        assert result.actual == result.expected,  result.parser_input
+    for expression, expected in expectations.items():
+        actual = quick_parse(QueryExpression, expression)
+        assert actual == expected, expression

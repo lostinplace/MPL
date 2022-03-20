@@ -41,6 +41,9 @@ class TextExpression(Expression):
     def qualify(self, *_) -> TextExpression:
         return self
 
+    def unqualify(self, *_) -> TextExpression:
+        return self
+
 
 class TextExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     text_expression_operand = svt.string_token

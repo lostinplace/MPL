@@ -118,29 +118,29 @@ def target_or(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
 
     return false_result
 
-
-def query_gt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
-    if op1 > op2:
-        return op1
-    return false_result
-
-
-def query_lt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
-    if op1 < op2:
-        return op1
-    return false_result
-
-
-def query_ge(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
-    if op1 >= op2:
-        return op1
-    return false_result
-
-
-def query_le(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
-    if op1 <= op2:
-        return op1
-    return false_result
+#
+# def query_gt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+#     if op1 > op2:
+#         return op1
+#     return false_result
+#
+#
+# def query_lt(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+#     if op1 < op2:
+#         return op1
+#     return false_result
+#
+#
+# def query_ge(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+#     if op1 >= op2:
+#         return op1
+#     return false_result
+#
+#
+# def query_le(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:
+#     if op1 <= op2:
+#         return op1
+#     return false_result
 
 
 def query_eq(op1: LogicalResult, op2: LogicalResult) -> LogicalResult:

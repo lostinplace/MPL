@@ -1,6 +1,6 @@
 import dataclasses
 from collections import UserDict
-from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
+from typing import FrozenSet, Dict, Union, Set, Tuple
 
 from networkx import MultiDiGraph
 from sympy import Expr
@@ -20,8 +20,9 @@ class EngineContext(UserDict):
     hash_refs: Dict[int, Reference] = {}
 
     @property
-    def active(self) -> FrozenSet[Reference]:
-        return frozenset(ref for ref in self if self.get(ref).value)
+    def active(self) -> Dict[Reference, FrozenSet]:
+        items = [(ref, entity.value) for ref, entity in self.items() if entity.value]
+        return dict(items)
 
     @property
     def ref_names(self) -> FrozenSet[str]:
@@ -104,6 +105,15 @@ class EngineContext(UserDict):
 
     def get_diff(self, other: 'EngineContext') -> context_diff:
         return EngineContext.diff(self, other)
+
+    def __str__(self):
+        items = [(x[0].name, x[1]) for x in self.active.items()]
+        lines = []
+        for key, value in items:
+            value_component = ','.join(str(x) for x in value)
+            lines.append(f'{key}: {{{value_component}}}')
+        sorted_lines = sorted(lines)
+        return '\n'.join(sorted_lines)
 
 
 

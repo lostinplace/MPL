@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typing
 from dataclasses import dataclass, replace
-from typing import FrozenSet
+from typing import FrozenSet, Tuple
 
 from parsita import TextParsers
 from parsita.util import splat
 
-from mpl.Parser.ExpressionParsers import Expression
+from mpl.Parser.ExpressionParsers import Expression, T
 from mpl.Parser.ExpressionParsers.query_expression_parser \
     import QueryExpression, QueryExpressionParsers as QExP
 from mpl.Parser.ExpressionParsers.reference_expression_parser \
@@ -17,6 +17,11 @@ from mpl.Parser.Tokenizers.operator_tokenizers import AssignmentOperator, Assign
 
 @dataclass(frozen=True, order=True)
 class AssignmentExpression(Expression):
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> T:
+        new_lhs = self.lhs.unqualify(context, ignore_types)
+        new_rhs = self.rhs.unqualify(context, ignore_types)
+        return replace(self, lhs=new_lhs, rhs=new_rhs)
+
     lhs: ReferenceExpression
     rhs: QueryExpression
     operator: AssignmentOperator = AssignmentOperator("=")

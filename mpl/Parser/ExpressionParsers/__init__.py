@@ -10,6 +10,10 @@ class Expression(ABC, Generic[T]):
     def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> T:
         pass
 
+    @abstractmethod
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> T:
+        pass
+
     @property
     @abstractmethod
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:

@@ -1,4 +1,6 @@
 import os
+from functools import reduce
+from typing import Tuple, Any, Dict
 
 from parsita import Success
 from prompt_toolkit import print_formatted_text as print, HTML
@@ -15,10 +17,11 @@ from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file
 from mpl.interpreter.rule_evaluation import RuleInterpreter
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.runtime.cli.command_parser import CommandParsers, SystemCommand, TickCommand, ExploreCommand, QueryCommand, \
-    ActivateCommand, LoadCommand
+    ActivateCommand, LoadCommand, AddRuleCommand, ClearCommand, MemoryType, DropRuleCommand, SaveCommand
 
 
 def is_valid_command(text):
@@ -51,13 +54,15 @@ bindings = KeyBindings()
 
 def get_help() -> str:
     text = """
-    {rule}              Add Rule to current engine
+    {rule}              Immediately Executes Rule Once
+    add {rule}          Adds Rule to the current engine
+    clear context       Clears the context of the engine
+    clear rules         Clears all rules from the engine
+    clear all           Clears all the data in the engine
     .                   increments the state of the engine, then prints the active references
     .{n}                increments the state of the engine n times then prints the active references
-    +{name}	            activates the named reference
-    +{name}={value}	    activates the named reference with the provided value
-    -{name}	            deactivates the named reference
-    explore {n}	        conducts an exploration of n iterations and prints the distribution of outcomes
+    +{name}             activates the named reference
+    -{name}             deactivates the named reference
     ?                   prints the current engine context
     ?{name}             prints the state of the named reference
     quit                exits the environment
@@ -95,6 +100,13 @@ def format_data_for_cli_output(response, interior=True) -> str:
             result = response.name
         case RuleExpression():
             result = str(response)
+        case MPLEngine() as engine:
+            expressions = [x.expression for x in response.rule_interpreters]
+            result = map(format_data_for_cli_output, expressions)
+            result = list(sorted(result))
+            rules = '\n'.join(result)
+            context = format_data_for_cli_output(response.context)
+            return f'{rules}\n---\n{context}'
         case MPLEntity():
             if response.value:
                 contents = format_data_for_cli_output(response.value)
@@ -106,7 +118,7 @@ def format_data_for_cli_output(response, interior=True) -> str:
     return result
 
 
-def execute_command(engine: MPLEngine, command: str):
+def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | SystemCommand | Dict:
     result = CommandParsers.command.parse(command)
     value = result.value
     match value:
@@ -119,11 +131,29 @@ def execute_command(engine: MPLEngine, command: str):
             return expressions
         case RuleExpression():
             interpreter = RuleInterpreter.from_expression(value)
+            context = EngineContext.from_references(interpreter.references)
+            engine.context = context | engine.context
             result = engine.execute_interpreters({interpreter})
             return result
-        case LoadCommand():
-            engine = value.load()
-            return engine.graph.edges()
+        case AddRuleCommand():
+            engine.add(value.expression)
+            return f'Incorporated Rule: {value.expression}'
+        case DropRuleCommand():
+            engine.remove(value.expression)
+            return f'Dropped Rule: {value.expression}'
+        case LoadCommand(path, MemoryType.CONTEXT):
+            new_context, _ = process_machine_file(path)
+            engine.context |= new_context
+            return engine
+        case LoadCommand(path, MemoryType.RULES):
+            new_engine = MPLEngine.from_file(path)
+            new_engine.context |= engine.context
+            return new_engine
+        case LoadCommand(path, MemoryType.ALL):
+            engine = MPLEngine.from_file(path)
+            return engine
+        case SaveCommand():
+            value.save(engine)
         case TickCommand():
             start_context = engine.context
             engine.tick(value.number)
@@ -139,8 +169,21 @@ def execute_command(engine: MPLEngine, command: str):
                     tmp = engine.query(query_command.reference)
                     return {query_command.reference: tmp}
                 case None:
-                    result = engine.context
+                    result = engine.active
                     return result
+        case ClearCommand():
+            match value.memory_type:
+                case MemoryType.CONTEXT:
+                    contexts = [EngineContext.from_interpreter(x) for x in engine.rule_interpreters]
+                    engine.context = reduce(EngineContext.__or__, contexts)
+                    return engine
+                case MemoryType.RULES:
+                    new_engine = MPLEngine()
+                    new_engine.context = engine.context
+                    return new_engine
+                case MemoryType.ALL:
+                    return MPLEngine()
+
         case ActivateCommand() as activate_command:
             re = RuleExpression((activate_command.expression,), tuple())
             interpreter = RuleInterpreter.from_expression(re)
@@ -151,6 +194,8 @@ def execute_command(engine: MPLEngine, command: str):
             resolved = resolve_conflicts(conflicts)
             result = engine.apply(resolved)
             return result
+        case _:
+            return f'Unknown command: {value}'
 
 
 def run_interactive_session():
@@ -158,6 +203,12 @@ def run_interactive_session():
     our_history = FileHistory(history_path)
     session = PromptSession(history=our_history)
     completion_dict = {
+        'clear': {
+            'context',
+            'rules',
+            'all',
+        },
+        'add': None,
         'help': None,
         'quit': None,
         'explore': None,
@@ -169,6 +220,7 @@ def run_interactive_session():
         'style': style,
         'key_bindings': bindings,
         'bottom_toolbar': Toolbar.bottom_toolbar,
+        'complete_while_typing': True,
     }
     engine = MPLEngine()
 
@@ -176,6 +228,8 @@ def run_interactive_session():
         Toolbar.active_refs = len(engine.context.active)
         Toolbar.active_rules = len(engine.rule_interpreters)
         ref_names = set(engine.context.ref_names)
+        ref_names = dict([(x, None) for x in ref_names])
+
         adjustments = {
             '+': ref_names,
             '-': ref_names,
@@ -187,8 +241,11 @@ def run_interactive_session():
         prompt_kwargs['completer'] = completer
         command = session.prompt('>  ', **prompt_kwargs)
         command_result = execute_command(engine, command)
-        if command_result == SystemCommand.QUIT:
-            return
+        match command_result:
+            case MPLEngine():
+                engine = command_result
+            case SystemCommand.QUIT:
+                return
         output = format_data_for_cli_output(command_result, False)
         print(output)
 

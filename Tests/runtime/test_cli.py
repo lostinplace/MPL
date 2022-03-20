@@ -26,7 +26,6 @@ def test_command_parsing():
         '?': QueryCommand(),
         'explore 13': ExploreCommand(13),
         'explore': ExploreCommand(1),
-        '+test=`me`': ActivateCommand(quick_parse(AssignmentExpression, f"test=`me`")),
         '+a': ActivateCommand(quick_parse(AssignmentExpression, f"a={Ref('a').id}")),
         '.': TickCommand(1),
         '.1': TickCommand(1),
@@ -46,8 +45,7 @@ def test_command_execution():
     ]
 
     expectations = {
-        'A->B->C': quick_parse(RuleExpression, 'A->B->C'),
-        '+test =  5': {'test': (fs(), fs(5))},
+        'add A->B->C': f'Incorporated Rule: {quick_parse(RuleExpression, "A->B->C")}',
         '+test': {'test': (fs(), fs(Ref('test').id))},
     }
 
@@ -61,37 +59,43 @@ def test_command_execution():
 
 
 def test_command_sequences():
-    expressions = [
+    expressions = {
         quick_parse(RuleExpression, 'test -> no test')
-    ]
+    }
 
-    expectations = {
-        ('load Tests/test_files/simplest.mpl'): [
-            None
-        ],
-        ('state one->state two', '+state one', '.', '.-1'): [
-            None,
-            {'state one': (fs(), fs(Ref('state one').id))},
-            {
+    expectations = [
+        {
+            'load Tests/test_files/simplest.mpl': None
+        },
+        {
+            'add state one->state two': f'Incorporated Rule: {quick_parse(RuleExpression, "state one->state two")}',
+            '+state one': {'state one': (fs(), fs(Ref('state one').id))},
+            '.': {
                 'state one': (fs(Ref('state one').id), fs()),
                 'state two': (fs(), fs(Ref('state one').id)),
             },
-            {
+            '.-1': {
                 'state one': (fs(), fs(Ref('state one').id)),
                 'state two': (fs(Ref('state one').id), fs()),
             },
-        ],
-        ('A->B->C', '.', '?A', '+A'): [
-            quick_parse(RuleExpression, 'A->B->C'),
-            None,
-            {Ref('A'): fs()},
-            None,
-        ],
-    }
+        },
+        {
+            'add A->B->C': f'Incorporated Rule: {quick_parse(RuleExpression, "A->B->C")}',
+            '.': None,
+            '?A': {Ref('A'): fs()},
+            '+A': None,
+        },
+        {
+            'load Tests/test_files/simplest.mpl': None,
+            '+Three': {'Three': (fs(), fs(Ref('Three').id))},
+            'clear context': None,
+            '?': {}
+        }
+    ]
 
-    for commands, expected_structure in expectations.items():
+    for command_sequence in expectations:
         engine = MPLEngine()
         engine.add(expressions)
-        for command, expected in zip_longest(commands, expected_structure):
+        for command, expected in command_sequence.items():
             result = execute_command(engine, command)
             assert expected is None or result == expected

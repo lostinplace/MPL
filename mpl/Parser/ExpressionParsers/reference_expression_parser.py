@@ -59,6 +59,10 @@ class Reference:
             case _:
                 return ''
 
+    def to_reference_expression(self) -> 'ReferenceExpression':
+        path = self.name.split('.')
+        return ReferenceExpression(tuple(path), self.types)
+
     @property
     def as_type_dict(self) -> Dict[str, 'Reference']:
         result = {None: dataclasses.replace(self, types=None)}
@@ -166,12 +170,17 @@ class ReferenceExpression:
     @staticmethod
     def void(prefix) -> 'ReferenceExpression':
         if prefix:
-            as_strings = tuple(str(x) for x in prefix[0])
+            as_strings = tuple(x.content for x in prefix[0])
             return ReferenceExpression(as_strings + ('void',), None)
         return ReferenceExpression(('void',))
 
     def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
         return ReferenceExpression(context + self.path, self.types if not ignore_types else frozenset())
+
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
+        if self.path[:len(context)] == context:
+            return ReferenceExpression(self.path[len(context):], self.types if not ignore_types else frozenset())
+        return self
 
     @property
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:

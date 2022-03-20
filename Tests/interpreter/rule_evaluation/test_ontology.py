@@ -2,6 +2,7 @@ import networkx as nx
 
 from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
+from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, get_current_path, PathInfo, \
     get_edges_by_type, Relationship
 
@@ -51,6 +52,7 @@ RE(Wumpus.Health.Hurt & <Wumpus.Turn Ended> ~@ Wumpus.Turns Wounded += 1) uses M
 
 """
 
+
 def test_context_generation():
     machine_file = MachineFile.from_file('Tests/test_files/simple_wumpus.mpl')
     assert machine_file.lines
@@ -61,6 +63,13 @@ def test_context_generation():
     x = list(x)
     assert graph.has_edge(Ref('Wumpus.Health'), Ref('Wumpus'))
     assert context
+
+
+def test_context_generation_with_context():
+    machine_file = MachineFile.from_file('Tests/test_files/simplest.mpl')
+    context, graph = process_machine_file(machine_file)
+    assert context[Ref('One')] == MPLEntity('One', frozenset({1}))
+
 
 
 def test_combinations():

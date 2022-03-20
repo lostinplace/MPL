@@ -30,6 +30,12 @@ class TriggerExpression(Expression):
         new_messages = tuple(message.qualify(context, ignore_types) for message in self.messages) if self.messages else None
         return TriggerExpression(self.name, new_source, new_messages)
 
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'TriggerExpression':
+        new_source = self.source.unqualify(context, ignore_types) if self.source else None
+        new_messages = tuple(message.unqualify(context, ignore_types) for message in self.messages) if self.messages else None
+        return TriggerExpression(self.name, new_source, new_messages)
+
+
     @property
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:
         messages = self.messages or ()

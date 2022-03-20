@@ -9,9 +9,11 @@ from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
 from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
-from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph
+from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph, \
+    construct_graph_from_expressions
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation
 from mpl.lib import fs
+from mpl.lib.graph_operations import combine_graphs, drop_from_graph
 
 
 @dataclass(order=True)
@@ -19,7 +21,7 @@ class MPLEngine:
     rule_interpreters: Set[RuleInterpreter] = frozenset()
     context: EngineContext = EngineContext()
     history: Tuple[context_diff, ...] = ()
-    graph: Optional[MultiDiGraph] = None
+    graph: Optional[MultiDiGraph] = MultiDiGraph()
 
     @staticmethod
     def from_file(file: str | MachineFile) -> 'MPLEngine':
@@ -31,16 +33,38 @@ class MPLEngine:
         interpreters = {RuleInterpreter.from_expression(rule) for rule in rule_expressions}
         return MPLEngine(interpreters, context, (), graph)
 
-    def add(self, rules: RuleExpression | Set[RuleExpression]):
-        rule: Set[RuleExpression]
+    def add(self, rules: RuleExpression | Set[RuleExpression], inplace=True) -> 'MPLEngine':
+
         if not isinstance(rules, Iterable):
             rules = {rules}
-        for rule in rules:
-            interpreter = RuleInterpreter.from_expression(rule)
-            tmp_context = EngineContext.from_interpreter(interpreter)
-            new_context = tmp_context | self.context
-            self.rule_interpreters |= fs(interpreter)
-            self.context = new_context
+
+        new_graph = construct_graph_from_expressions(rules)
+        graph = combine_graphs(self.graph, new_graph)
+        context = EngineContext.from_graph(graph) | self.context
+        interpreters = {RuleInterpreter.from_expression(rule) for rule in rules} | self.rule_interpreters
+
+        if inplace:
+            self.context = context
+            self.rule_interpreters = interpreters
+            self.graph = graph
+            return self
+
+        return MPLEngine(interpreters, context, self.history, graph)
+
+    def remove(self, rules: RuleExpression | Set[RuleExpression], inplace=True) -> 'MPLEngine':
+        if not isinstance(rules, Iterable):
+            rules = {rules}
+
+        new_interpreters = {interpreter for interpreter in self.rule_interpreters if interpreter.expression not in rules}
+        expressions = {interpreter.expression for interpreter in new_interpreters}
+        new_graph = drop_from_graph(expressions, self.graph)
+
+        if inplace:
+            self.rule_interpreters = new_interpreters
+            self.graph = new_graph
+            return self
+
+        return MPLEngine(new_interpreters, self.context, self.history, new_graph)
 
     def execute_expression(self, expression: RuleExpression) -> Dict[str, Tuple[Any, Any]]:
         original_context = self.context
@@ -75,6 +99,7 @@ class MPLEngine:
 
     def tick(self, count: int = 1) -> Dict[str, Tuple[Any, Any]]:
         original_context = self.context
+        output = dict()
         if count > 0:
             #  tick forward
             for tick in range(count):
@@ -126,6 +151,12 @@ class MPLEngine:
                 return value
 
     @property
-    def active(self) -> FrozenSet[Reference]:
+    def active(self) -> Dict[Reference, FrozenSet]:
         return self.context.active
+
+    def __hash__(self):
+        context_set = frozenset(self.context.items())
+        edges = self.graph.edges(data='relationship')
+        edges_as_set = frozenset(edges)
+        return hash((context_set, frozenset(self.rule_interpreters), edges_as_set, self.history))
 

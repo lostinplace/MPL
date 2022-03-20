@@ -63,6 +63,10 @@ class QueryExpression(Expression):
         new_operands = tuple(x.qualify(context, ignore_types) for x in self.operands)
         return QueryExpression(new_operands, self.operators)
 
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'QueryExpression':
+        new_operands = tuple(x.unqualify(context, ignore_types) for x in self.operands)
+        return QueryExpression(new_operands, self.operators)
+
     @staticmethod
     def interpret(parser_results: SeparatedList | Negation):
         match parser_results:

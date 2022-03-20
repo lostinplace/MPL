@@ -57,6 +57,14 @@ class ArithmeticExpression(Expression):
         )
         return ArithmeticExpression(new_operands, self.operators)
 
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ArithmeticExpression':
+        new_operands = tuple(
+            operand.unqualify(context, ignore_types)
+            if isinstance(operand, (ReferenceExpression, ArithmeticExpression)) else operand
+            for operand in self.operands
+        )
+        return ArithmeticExpression(new_operands, self.operators)
+
     @staticmethod
     def interpret(parser_results: SeparatedList) -> 'ArithmeticExpression':
         operands = tuple(parser_results)

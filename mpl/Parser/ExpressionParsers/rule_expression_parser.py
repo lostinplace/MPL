@@ -53,6 +53,13 @@ class RuleExpression(Expression):
             operators=self.operators
         )
 
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'RuleExpression':
+        clauses = tuple(clause.unqualify(context, ignore_types) for clause in self.clauses)
+        return RuleExpression(
+            clauses=clauses,
+            operators=self.operators
+        )
+
     @property
     def reference_expressions(self) -> FrozenSet[ReferenceExpression]:
         result = frozenset()

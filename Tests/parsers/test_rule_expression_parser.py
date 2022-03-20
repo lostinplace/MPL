@@ -1,12 +1,30 @@
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
-from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
+from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator, QueryOperator
 from Tests import collect_parsing_expectations, quick_parse
 
 
 expectations = {
+        'Mindset.* & Health.Ok ~> Mindset.Feel Secure': RuleExpression(
+            (
+                QueryExpression(
+                    (
+                        ReferenceExpression(('Mindset', '*')),
+                        quick_parse(ReferenceExpression, 'Health.Ok'),
+                    ),
+                    (
+                        QueryOperator('&'),
+                    )
+                ),
+                quick_parse(QueryExpression, 'Mindset.Feel Secure'),
+            ),
+            (
+                MPLOperator('ANY', 'OBSERVE', 'STATE', 22),
+            )
+        ),
         '!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure': RuleExpression(
             (
                 quick_parse(QueryExpression, '!Smell Prey & Flee'),

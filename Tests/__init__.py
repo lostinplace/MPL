@@ -10,6 +10,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceEx
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
+from mpl.Parser.ExpressionParsers.vector_expression_parser import VectorExpression, VectorExpressionParsers
 from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, StringToken
 
 
@@ -87,6 +88,7 @@ parser_map ={
     ScenarioExpression: ScenarioExpressionParsers.expression,
     RuleExpression: RuleExpressionParsers.expression,
     StringToken: SimpleValueTokenizers.string_token,
+    VectorExpression: VectorExpressionParsers.expression,
 }
 
 

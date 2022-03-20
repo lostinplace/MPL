@@ -265,29 +265,3 @@ def engine_to_string(engine: 'MPLEngine') -> str:
 
     return result
 
-
-def test_engine_to_string():
-    from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
-
-    test_files = [
-        'Tests/test_files/simple_wumpus.mpl',
-        'Tests/test_files/simplest.mpl',
-    ]
-
-    for test_file in test_files:
-        original_engine = MPLEngine.from_file(test_file)
-        rnd = Random(0)
-        key = rnd.choice(list(original_engine.context.keys()))
-        original_engine.activate(key)
-
-        content = engine_to_string(original_engine)
-        mf = MachineFile.parse(content)
-        new_engine = MPLEngine.from_file(mf)
-        assert original_engine.context == new_engine.context
-        assert original_engine.rule_interpreters == new_engine.rule_interpreters
-        original_graph = set(original_engine.graph.edges(data='relationship'))
-        new_graph = set(new_engine.graph.edges(data='relationship'))
-        assert original_graph == new_graph
-        assert hash(original_engine) == hash(new_engine)
-
-

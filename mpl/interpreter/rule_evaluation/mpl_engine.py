@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, List, Generator, Optional
+from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, Optional
 
 from networkx import MultiDiGraph
 
@@ -8,7 +8,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph, \
     construct_graph_from_expressions
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation
@@ -119,11 +119,13 @@ class MPLEngine:
 
     @staticmethod
     def invert_diff(diff: context_diff) -> FrozenSet[RuleInterpretation]:
+        from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+
         diff_change = dict()
         diff_descriptors = list()
         for key, diff_item in diff.items():
             key = Reference(key)
-            diff_change[key] = MPLEntity.from_reference(key, diff_item[0])
+            diff_change[key] = EntityValue.from_value(diff_item[0])
             descriptor = f'{key}::{diff_item[1]}→{diff_item[0]}'
             diff_descriptors.append(descriptor)
         name = ';'.join(diff_descriptors)
@@ -143,9 +145,11 @@ class MPLEngine:
         return old_context.get_diff(new_context)
 
     def query(self, ref: Reference):
+        from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+
         value = self.context.get(ref)
         match value:
-            case MPLEntity():
+            case EntityValue():
                 return value.value
             case _:
                 return value

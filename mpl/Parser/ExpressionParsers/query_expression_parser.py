@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from typing import Union, Tuple, FrozenSet
 
-from parsita import TextParsers, fwd, longest, lit
+from parsita import TextParsers, fwd, longest, lit, Success
 
 from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
@@ -81,6 +81,13 @@ class QueryExpression(Expression):
 
                 result = QueryExpression(operands, operators)
                 return result
+
+    @staticmethod
+    def parse(text: str) -> QueryExpression:
+        tmp = QueryExpressionParsers.expression.parse(text)
+        assert isinstance(tmp, Success)
+        return tmp.value
+
 
 
 class QueryExpressionParsers(TextParsers, whitespace=r'[ \t]*'):

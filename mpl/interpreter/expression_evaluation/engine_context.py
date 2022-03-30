@@ -1,32 +1,44 @@
 import dataclasses
-from collections import UserDict
-from typing import FrozenSet, Dict, Union, Set, Tuple
+from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
 
 from networkx import MultiDiGraph
-from sympy import Expr
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretation
+from mpl.lib.context_tree.context_tree_implementation import ContextTree, apply_changes
 
 ref_name = Union[str, Ref]
 
-context_diff = Dict[str, Tuple[FrozenSet, FrozenSet]]
+context_diff = Dict[str, Tuple[Optional[EntityValue], Optional[EntityValue]]]
 
 
-class EngineContext(UserDict):
-    ref_hashes: Dict[Reference, int] = {}
-    hash_refs: Dict[int, Reference] = {}
+@dataclasses.dataclass
+class EngineContext:
+    tree: ContextTree = ContextTree()
+
+    def __getitem__(self, item: Reference) -> 'EntityValue':
+        return self.tree[item]
+
+    def __setitem__(self, key: Reference, value: EntityValue):
+        match key:
+            case Reference():
+                self.tree[key] = value
+
+    def update(self, other: Dict[Reference, EntityValue]) -> Dict[Reference, EntityValue]:
+        return self.tree.update(other)
+
+    def clear(self, ref: Reference | Set[Reference]) -> Dict[Reference, EntityValue]:
+        return self.tree.clear(ref)
 
     @property
-    def active(self) -> Dict[Reference, FrozenSet]:
-        items = [(ref, entity.value) for ref, entity in self.items() if entity.value]
-        return dict(items)
+    def active(self) -> Dict[Reference, EntityValue]:
+        return {ref: value for ref, value in self.tree if value}
 
     @property
     def ref_names(self) -> FrozenSet[str]:
-        return frozenset(ref.name for ref in self)
+        return frozenset(item[0].name for item in self.tree)
 
     @staticmethod
     def from_graph(graph: MultiDiGraph) -> 'EngineContext':
@@ -35,15 +47,12 @@ class EngineContext(UserDict):
 
     @staticmethod
     def from_references(references: FrozenSet[Reference]) -> 'EngineContext':
+        from mpl.interpreter.expression_evaluation.entity_value import EntityValue
         result = EngineContext()
         for ref in references:
-            ref_hash = hash(ref)
-            result.ref_hashes[ref] = ref_hash
-            result.hash_refs[ref_hash] = ref
             # TODO: this doesn't differentiate between different types of entities, e.g. triggers.
             #  Figure out how these should be handled in the  reference graph and update it here.
-            entity = MPLEntity(ref.name, frozenset())
-            result[ref] = entity
+            result.tree.add(ref, EntityValue(value=frozenset()))
         return result
 
     @staticmethod
@@ -52,56 +61,49 @@ class EngineContext(UserDict):
         return EngineContext.from_references(references)
 
     def activate(self, ref: ref_name | Set[ref_name], value=None) -> 'EngineContext':
+        value = EntityValue.from_value(value)
         match ref:
             case Reference():
-                existing = self.get(ref)
-                match value:
-                    case None:
-                        new_value = existing.value | {ref.id}
-                    case frozenset() | set():
-                        new_value = value
-                    case _:
-                        new_value = existing.value | {value}
-
-                new_entity = dataclasses.replace(existing, value=new_value)
-
-                return EngineContext(self | {ref: new_entity})
+                new_tree = self.tree.__copy__()
+                new_tree[ref] |= value
+                return EngineContext(new_tree)
             case str():
                 return self.activate(Ref(ref), value)
             case refs:
-                result: EngineContext = self | {}
+                new_tree = self.tree.__copy__()
                 for ref in refs:
-                    result |= result.activate(ref, value)
-                return result
+                    new_tree[ref] |= value
+                return EngineContext(new_tree)
 
     def deactivate(self, ref: ref_name | Set[ref_name]) -> 'EngineContext':
-        return self.activate(ref, frozenset())
+        return self.activate(ref, EntityValue())
 
-    def to_dict(self) -> Dict[Reference, MPLEntity | Expr]:
-        return self.data
+    def to_dict(self) -> Dict[Reference, 'EntityValue']:
+        return self.tree.to_dict()
 
     def apply(self, interpretations: FrozenSet[RuleInterpretation]) -> 'EngineContext':
+        new_tree = self.tree.__copy__()
         sum_of_changes = dict()
         for interpretation in interpretations:
             sum_of_changes |= interpretation.changes
-        return self | sum_of_changes
+        apply_changes(sum_of_changes, new_tree)
+        return EngineContext(new_tree)
 
     @staticmethod
     def diff(
             initial_context: 'EngineContext',
             new_context: 'EngineContext'
-    ) -> Dict[str, Tuple[FrozenSet, FrozenSet]]:
-        out = dict()
-        for key in new_context:
-            old_entity = initial_context.get(key)
-            new_entity = new_context.get(key)
-            old_val = old_entity.value
-            new_val = new_entity.value
-            if old_val == new_val:
-                continue
-            diff = old_val, new_val
-            out[key.name] = diff
-        return out
+    ) -> context_diff:
+        c1_dict = initial_context.to_dict()
+        c2_dict = new_context.to_dict()
+        all_keys = set(c1_dict.keys()) | set(c2_dict.keys())
+        result = dict()
+        for key in all_keys:
+            v1 = c1_dict.get(key)
+            v2 = c2_dict.get(key)
+            result[key.name] = (v1, v2)
+
+        return result
 
     def get_diff(self, other: 'EngineContext') -> context_diff:
         return EngineContext.diff(self, other)
@@ -115,5 +117,6 @@ class EngineContext(UserDict):
         sorted_lines = sorted(lines)
         return '\n'.join(sorted_lines)
 
-
+    def __copy__(self):
+        return EngineContext(self.tree.__copy__())
 

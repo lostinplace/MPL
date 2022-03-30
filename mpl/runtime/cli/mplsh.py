@@ -16,10 +16,11 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file
 from mpl.interpreter.rule_evaluation import RuleInterpreter
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.runtime.cli.command_parser import CommandParsers, SystemCommand, TickCommand, ExploreCommand, QueryCommand, \
     ActivateCommand, LoadCommand, AddRuleCommand, ClearCommand, MemoryType, DropRuleCommand, SaveCommand
 
@@ -107,7 +108,7 @@ def format_data_for_cli_output(response, interior=True) -> str:
             rules = '\n'.join(result)
             context = format_data_for_cli_output(response.context)
             return f'{rules}\n---\n{context}'
-        case MPLEntity():
+        case EntityValue():
             if response.value:
                 contents = format_data_for_cli_output(response.value)
                 result = f'Entity({contents})'

@@ -1,6 +1,7 @@
 
 import dataclasses
 from enum import Enum
+from itertools import product
 from random import random, Random
 from typing import List, Tuple, Set, Optional, FrozenSet, Dict, Union
 
@@ -11,8 +12,6 @@ from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, Reference, Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
-
 
 
 class Relationship(Enum):
@@ -101,6 +100,8 @@ def construct_graph_from_expressions(expressions: Set[RuleExpression | Reference
                 for type in refx.types:
                     edges.add((typeless_ref, Relationship.IS_A, type))
                 edges.add((typeless_ref, Relationship.DEFINED_IN, parent or 'engine root'))
+                if not typeless_ref.is_void:
+                    edges.add((typeless_ref.void, Relationship.DEFINED_IN, typeless_ref))
             case RuleExpression() as rulex:
                 edges.add((rulex, Relationship.IS_A, 'rule'))
                 edges.add((rulex, Relationship.RUNS_IN, parent or 'engine root'))
@@ -117,16 +118,48 @@ def construct_graph_from_expressions(expressions: Set[RuleExpression | Reference
 
 
 def machine_file_context_to_engine_context(context: Dict[ReferenceExpression, FrozenSet]) -> EngineContext:
+    from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+
     result = EngineContext()
     for ref_x, value in context.items():
         ref = ref_x.reference
-        result[ref.without_types] = MPLEntity(ref.name, value)
+        result[ref.without_types] = EntityValue(value)
     return result
 
 
-def process_machine_file(file: MachineFile) -> (EngineContext, MultiDiGraph):
+def get_refs_missing_relationship(G: MultiDiGraph, relationship: Relationship) -> Set[Reference]:
+    edges = G.edges(data='relationship')
+    filtered = filter(lambda edge: edge[2] == relationship, edges)
+    not_applicable = set(map(lambda edge: edge[0], filtered))
+    refs = filter(lambda ref: isinstance(ref, Reference) and ref not in not_applicable, G.nodes())
+    return set(refs)
+
+
+def assign_missing_types(G: MultiDiGraph) -> MultiDiGraph:
+    refs = get_refs_missing_relationship(G, Relationship.IS_A)
+    for ref in refs:
+        G.add_edge(ref, 'state', relationship=Relationship.IS_A)
+    return G
+
+
+def assign_missing_parents(G: MultiDiGraph) -> MultiDiGraph:
+    while True:
+        refs = get_refs_missing_relationship(G, Relationship.DEFINED_IN)
+        if not refs:
+            return G
+        for ref in refs:
+            expr = ref.to_reference_expression()
+            expected_parent_path = expr.path[:-1]
+            expected_parent = ReferenceExpression(expected_parent_path).reference
+            G.add_edge(ref, expected_parent, relationship=Relationship.DEFINED_IN)
+
+
+def process_machine_file(file: MachineFile) -> (EngineContext, MultiDiGraph, Set):
     with_parentage = assign_parentage_from_machine_file(file)
     graph = construct_graph_from_expressions(with_parentage)
+    graph = assign_missing_parents(graph)
+    graph = assign_missing_types(graph)
+
     result_context = EngineContext.from_graph(graph)
     if file.context:
         loaded_context = machine_file_context_to_engine_context(file.context)
@@ -180,6 +213,11 @@ def get_parent_references(G: MultiDiGraph, ref: Reference) -> List[Reference]:
     return [x[1] for x in out_edges if x[2] == Relationship.DEFINED_IN]
 
 
+def get_child_references(G: MultiDiGraph, ref: Reference) -> List[Reference]:
+    in_edges = list(G.in_edges(ref, data='relationship'))
+    return [x[0] for x in in_edges if x[2] == Relationship.DEFINED_IN]
+
+
 def get_unqualified_typed_ref(G: MultiDiGraph, ref: Reference) -> ReferenceExpression:
     types = get_reference_types(G, ref)
     my_ref_expr = reference_expression_from_ref(ref, G)
@@ -190,17 +228,6 @@ def get_unqualified_typed_ref(G: MultiDiGraph, ref: Reference) -> ReferenceExpre
 
 
 TreeNode = Tuple[ReferenceExpression, List[Union['TreeNode', RuleExpression]]]
-
-
-def get_child_references(ref: ReferenceExpression, G: MultiDiGraph) -> List[Reference]:
-    result = []
-
-    for child_ref, _, relationship in G.in_edges(ref.reference.without_types, data='relationship'):
-        if relationship != Relationship.DEFINED_IN:
-            continue
-        result.append(child_ref)
-
-    return result
 
 
 def get_child_rules(ref: ReferenceExpression, G: MultiDiGraph) -> List[RuleExpression]:
@@ -214,7 +241,7 @@ def get_child_rules(ref: ReferenceExpression, G: MultiDiGraph) -> List[RuleExpre
 
 
 def get_child_rules_and_references(ref: ReferenceExpression, G: MultiDiGraph) -> List[TreeNode | RuleExpression]:
-    child_refences = get_child_references(ref, G)
+    child_refences = get_child_references(G, ref.reference)
     results = []
     for child_ref in child_refences:
         child_ref_expr = child_ref.to_reference_expression()
@@ -265,3 +292,59 @@ def engine_to_string(engine: 'MPLEngine') -> str:
 
     return result
 
+
+def get_sibling_groups(G: MultiDiGraph) -> Dict[Reference: Set[Reference]]:
+    refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
+    result = dict()
+    for ref in refs:
+        parent = get_parent_references(G, ref)[0]
+        siblings = get_child_references(G, parent)
+        result[ref] = set(siblings)
+    return result
+
+
+def get_type_map(G: MultiDiGraph) -> Dict[Reference, Set[Reference]]:
+    refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
+    result = dict()
+    for ref in refs:
+        types = get_reference_types(G, ref)
+        result[ref] = types
+    return result
+
+
+def get_parent_map(G: MultiDiGraph) -> Dict[Reference, Reference]:
+    refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
+    result = dict()
+    for ref in refs:
+        parents = get_parent_references(G, ref)
+        if parents:
+            result[ref] = parents[0]
+        else:
+            result[ref] = None
+    return result
+
+
+def get_child_map(G: MultiDiGraph) -> Dict[Reference, Set[Reference]]:
+    refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
+    result = dict()
+    for ref in refs:
+        children = set(get_child_references(G, ref))
+        result[ref] = children - {ref.void}
+
+    return result
+
+
+def get_all_descendants(G: MultiDiGraph, ref: Reference) -> Set[Reference]:
+    result = set()
+    for child in get_child_references(G, ref):
+        result.add(child)
+        result |= get_all_descendants(G, child)
+    return result
+
+
+def get_descendant_map(G: MultiDiGraph) -> Dict[Reference, Set[Reference]]:
+    refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
+    result = dict()
+    for ref in refs:
+        result[ref] = get_all_descendants(G, ref)
+    return result

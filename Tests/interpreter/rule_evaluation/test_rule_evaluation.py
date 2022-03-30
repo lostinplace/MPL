@@ -3,16 +3,17 @@ from dataclasses import dataclass
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from mpl.interpreter.rule_evaluation import RuleInterpretation, RuleInterpretationState, create_rule_interpreter
-from mpl.lib.query_logic import MPL_Context
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.lib import fs
+from mpl.lib.context_tree.context_tree_implementation import ContextTree
 
 
 @dataclass(frozen=True, order=True)
 class RuleEvaluation:
     source: str
-    context: MPL_Context
+    context: ContextTree
 
 
 RE = RuleEvaluation
@@ -23,30 +24,30 @@ def test_evaluate_rule():
 
     contexts = {
         'simple': {
-            Reference('a'): MPLEntity('a', fs(1)),
-            Reference('b'): MPLEntity('b', fs()),
+            Reference('a'): EntityValue(fs(1)),
+            Reference('b'): EntityValue(fs()),
         },
         'simple with c and d': {
-            Reference('a'): MPLEntity('a', fs(1)),
-            Reference('b'): MPLEntity('b', fs()),
-            Reference('c'): MPLEntity('c', fs(123)),
-            Reference('d'): MPLEntity('d', fs()),
+            Reference('a'): EntityValue(fs(1)),
+            Reference('b'): EntityValue(fs()),
+            Reference('c'): EntityValue(fs(123)),
+            Reference('d'): EntityValue(fs()),
         },
         'recovery': {
-            Reference('Recover'): MPLEntity('Recover', fs(5)),
-            Reference('Hurt'): MPLEntity('Hurt', fs(1)),
-            Reference('Ok'): MPLEntity('Ok', fs()),
+            Reference('Recover'): EntityValue(fs(5)),
+            Reference('Hurt'): EntityValue(fs(1)),
+            Reference('Ok'): EntityValue(fs()),
         },
         'simpler wumpus': {
-            Reference('Enter Strike Zone'): MPLEntity('Enter Strike Zone', fs(1)),
-            Reference('Feel Secure'): MPLEntity('Feel Secure', fs(12)),
-            Reference('Attack'): MPLEntity('Attack', fs()),
+            Reference('Enter Strike Zone'): EntityValue(fs(1)),
+            Reference('Feel Secure'): EntityValue(fs(12)),
+            Reference('Attack'): EntityValue(fs()),
         },
         'fleeing wumpus': {
-            Reference('Smell Prey'): MPLEntity('Smell Prey', fs()),
-            Reference('Flee'): MPLEntity('Flee', fs(2)),
-            Reference('noise'): MPLEntity('noise', fs()),
-            Reference('Feel Secure'): MPLEntity('Feel Secure', fs()),
+            Reference('Smell Prey'): EntityValue(fs()),
+            Reference('Flee'): EntityValue(fs(2)),
+            Reference('noise'): EntityValue(fs()),
+            Reference('Feel Secure'): EntityValue(fs()),
         }
 
     }
@@ -58,8 +59,8 @@ def test_evaluate_rule():
             RuleInterpretation(
                 RuleInterpretationState.APPLICABLE,
                 {
-                    Reference('Feel Secure'): MPLEntity('Feel Secure', fs()),
-                    Reference('Attack'): MPLEntity('Attack', fs(1, 9, 12)),
+                    Reference('Feel Secure'): EntityValue(fs()),
+                    Reference('Attack'): EntityValue(fs(1, 9, 12)),
                 },
                 scenarios=fs(9),
                 source='<Enter Strike Zone> ~> %{9} -> Feel Secure -> Attack'
@@ -67,33 +68,33 @@ def test_evaluate_rule():
         RE('!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure', contexts['fleeing wumpus']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
             {
-                Reference('noise'): MPLEntity('noise', fs('safe')),
-                Reference('Feel Secure'): MPLEntity('Feel Secure', fs(1)),
+                Reference('noise'): EntityValue(fs('safe')),
+                Reference('Feel Secure'): EntityValue(fs(1)),
             },
             source='!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure'
         ),
         RE('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(RuleInterpretationState.APPLICABLE,
             {
-                Reference('Hurt'): MPLEntity('Hurt', fs()),
-                Reference('Ok'): MPLEntity('Ok', fs(1)),
+                Reference('Hurt'): EntityValue(fs()),
+                Reference('Ok'): EntityValue(fs(1)),
             },
             source='Recover ~> Hurt -> Ok'
         ),
         RE('a -> b', contexts['simple']): RuleInterpretation(RuleInterpretationState.APPLICABLE,
             {
-                Reference('a'): MPLEntity('a', fs()),
-                Reference('b'): MPLEntity('b', fs(1)),
+                Reference('a'): EntityValue(fs()),
+                Reference('b'): EntityValue(fs(1)),
             },
             source='a -> b'
         ),
         RE('b -> a', contexts['simple']): RuleInterpretation(RuleInterpretationState.NOT_APPLICABLE, {
-            Reference('a'): MPLEntity('a', fs(1)),
-            Reference('b'): MPLEntity('b', fs()),
+            Reference('a'): EntityValue(fs(1)),
+            Reference('b'): EntityValue(fs()),
         }, source='b -> a'),
         RE('a -> c -> b', contexts['simple with c and d']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
-            Reference('a'): MPLEntity('a', fs()),
-            Reference('b'): MPLEntity('b', fs(1, 123)),
-            Reference('c'): MPLEntity('c', fs()),
+            Reference('a'): EntityValue(fs()),
+            Reference('b'): EntityValue(fs(1, 123)),
+            Reference('c'): EntityValue(fs()),
         }, source='a -> c -> b'),
     }
 

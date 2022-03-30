@@ -3,8 +3,9 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from mpl.lib import fs
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 
 
 def test_context_generation_from_expressions():
@@ -13,17 +14,17 @@ def test_context_generation_from_expressions():
 
     expectations = {
         'a & b | c + 3': {
-            Ref('a'): MPLEntity('a', frozenset()),
-            Ref('b'): MPLEntity('b', frozenset()),
-            Ref('c'): MPLEntity('c', frozenset()),
+            Ref('a'): EntityValue(frozenset()),
+            Ref('b'): EntityValue(frozenset()),
+            Ref('c'): EntityValue(frozenset()),
         },
         'test = b + 3 & `bart`': {
-            Ref('test'): MPLEntity('test', frozenset()),
-            Ref('b'): MPLEntity('b', frozenset()),
+            Ref('test'): EntityValue(frozenset()),
+            Ref('b'): EntityValue(frozenset()),
         },
         '%{a & b}': {
-            Ref('a'): MPLEntity('a', frozenset()),
-            Ref('b'): MPLEntity('b', frozenset()),
+            Ref('a'): EntityValue(frozenset()),
+            Ref('b'): EntityValue(frozenset()),
         },
     }
 
@@ -42,10 +43,10 @@ def test_context_generation_from_rules():
 
     expectations = {
         'a & b -> c -> d': {
-            Ref('a'): MPLEntity('a', frozenset()),
-            Ref('b'): MPLEntity('b', frozenset()),
-            Ref('c'): MPLEntity('c', frozenset()),
-            Ref('d'): MPLEntity('d', frozenset()),
+            Ref('a'): EntityValue(frozenset()),
+            Ref('b'): EntityValue(frozenset()),
+            Ref('c'): EntityValue(frozenset()),
+            Ref('d'): EntityValue(frozenset()),
         },
     }
 
@@ -60,29 +61,26 @@ def test_context_activation():
     from Tests import quick_parse
 
     expectations = {
-        ('test  & something complex ^ `with a string` + ok', fs('test', 'something complex'), None): {
-            Ref('test'): MPLEntity('test', frozenset([hash(Ref('test'))])),
+        ('test  & something complex ^ `with a string` + ok', fs('something complex'), None): {
+            Ref('test'): EntityValue(frozenset([hash(Ref('test'))])),
             Ref('something complex'):
-                MPLEntity(
-                    'something complex',
-                    frozenset([hash(Ref('something complex'))])
-                ),
-            Ref('ok'): MPLEntity('ok', frozenset()),
+                EntityValue.from_value(hash(Ref('something complex'))),
+            Ref('ok'): EntityValue(frozenset()),
         },
         ('a & b', 'a', None): {
-            Ref('a'): MPLEntity('a', frozenset([hash(Ref('a'))])),
-            Ref('b'): MPLEntity('b', frozenset()),
+            Ref('a'): EntityValue(frozenset([hash(Ref('a'))])),
+            Ref('b'): EntityValue(frozenset()),
         },
         ('test  & something ^ not me', Ref('test'), None): {
-            Ref('test'): MPLEntity('test', frozenset([hash(Ref('test'))])),
-            Ref('something'): MPLEntity('something', frozenset()),
-            Ref('not me'): MPLEntity('not me', frozenset()),
+            Ref('test'): EntityValue(frozenset([hash(Ref('test'))])),
+            Ref('something'): EntityValue(frozenset()),
+            Ref('not me'): EntityValue(frozenset()),
         },
         ('test  & something ^ not me | complicated', fs(Ref('test'), 'complicated'), 'ok'): {
-            Ref('test'): MPLEntity('test', fs('ok')),
-            Ref('something'): MPLEntity('something', frozenset()),
-            Ref('not me'): MPLEntity('not me', frozenset()),
-            Ref('complicated'): MPLEntity('complicated', fs('ok')),
+            Ref('test'): EntityValue(fs('ok')),
+            Ref('something'): EntityValue(frozenset()),
+            Ref('not me'): EntityValue(frozenset()),
+            Ref('complicated'): EntityValue(fs('ok')),
         },
     }
 

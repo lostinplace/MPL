@@ -1,11 +1,12 @@
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from sympy import abc, N, symbols
 
 from mpl.lib import fs
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.lib.query_logic import query_and, query_negate, query_or, query_xor, eval_expr_with_context, query_gt, \
     query_lt, \
-    query_ge, query_le, query_eq, query_neq, target_and, target_or, target_xor
+    query_ge, query_le, query_eq, target_and, target_or, target_xor
 
 red, black, uncolored = symbols('red black uncolored')
 bank = Reference('bank').as_symbol()
@@ -16,10 +17,10 @@ context = {
     Reference('a'): 5,
     Reference('b'): 'test',
     Reference('state one'):
-        MPLEntity('state one', fs(5, -8.0, 'test')),
-    Reference('bank'): MPLEntity('bank', fs(3 * red + 5 * black)),
+        EntityValue(fs(5, -8.0, 'test')),
+    Reference('bank'): EntityValue(fs(3 * red + 5 * black)),
     Reference('cost'): 2 * red + 3 * uncolored,
-    Reference('notactive'): MPLEntity('notactive', fs()),
+    Reference('notactive'): EntityValue(fs()),
 
 }
 
@@ -128,9 +129,9 @@ def test_logical_xor():
 
 
 def test_target_and():
-    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity('cost', fs(cost_expr))
+    cost = EntityValue(fs(cost_expr))
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -145,10 +146,10 @@ def test_target_and():
 
 
 def test_target_or():
-    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity('cost', fs(cost_expr))
-    empty = MPLEntity('empty', fs())
+    cost = EntityValue(fs(cost_expr))
+    empty = EntityValue(fs())
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -166,11 +167,11 @@ def test_target_or():
 
 
 def test_target_xor():
-    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity('cost', fs(cost_expr))
-    empty = MPLEntity('empty', fs())
-    empty_2 = MPLEntity('empty', fs())
+    cost = EntityValue(fs(cost_expr))
+    empty = EntityValue(fs())
+    empty_2 = EntityValue(fs())
 
     expectations = {
         (fs(1), fs(2, 3)): fs(),
@@ -198,9 +199,9 @@ def test_target_xor():
 
 def test_logical_gt():
 
-    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity('cost', fs(cost_expr))
+    cost = EntityValue(fs(cost_expr))
 
     expectations = {
         (fs(abc.d), fs()): fs(abc.d),
@@ -223,8 +224,8 @@ def test_logical_gt():
 
 def test_logical_eq():
     cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = MPLEntity('bank', fs(cost_expr))
-    cost = MPLEntity('cost', fs(cost_expr))
+    bank = EntityValue(fs(cost_expr))
+    cost = EntityValue(fs(cost_expr))
 
     expectations = {
         (fs(bank), fs(cost)): fs(bank, cost),
@@ -240,30 +241,11 @@ def test_logical_eq():
         assert actual == expected, repr(input)
 
 
-def test_logical_neq():
-    cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = MPLEntity('bank', fs(cost_expr))
-    cost = MPLEntity('cost', fs(cost_expr))
-
-    expectations = {
-        (fs(12, 20), fs(12, 20, 6)): fs(6),
-        (fs(bank), fs(cost)): fs(),
-        (fs(12, bank), fs(N(12), bank)): fs(),
-        (fs(12, 20), fs(12, 20)): fs(),
-        (fs(12, 20, 6), fs(12, 20)): fs(6),
-        (fs(12), fs(N(12))): fs(),
-    }
-
-    for input, expected in expectations.items():
-        actual = query_neq(input[0], input[1])
-        assert actual == expected, repr(input)
-
-
 def test_logical_inequality_comparisons():
 
-    bank = MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = MPLEntity('cost', fs(cost_expr))
+    cost = EntityValue(fs(cost_expr))
 
     expectations = {
         (fs(), fs(abc.d)): {

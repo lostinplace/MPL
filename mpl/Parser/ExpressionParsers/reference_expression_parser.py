@@ -11,8 +11,9 @@ REFERENCE_EXPRESSION = REFERENCE_TOKEN (: REFERENCE_EXPRESSION)?
 import dataclasses
 import re
 import os
+from numbers import Number
 
-from sympy import Symbol, symbols
+from sympy import Symbol, symbols, Expr
 from dataclasses import dataclass
 from typing import Optional, Tuple, Iterable, Union, List, FrozenSet, Dict
 
@@ -41,12 +42,6 @@ class Reference:
     name: str
     types: Optional[FrozenSet[str]] = None
 
-    def stringify(self):
-        result = f'{self.name}'
-        if self.types:
-            result += f': {self.types}'
-        return result
-
     @property
     def types_str(self):
         match self.types:
@@ -58,6 +53,22 @@ class Reference:
                 return ''
             case _:
                 return ''
+
+    @property
+    def is_void(self) -> bool:
+        return self.name[-2:] == '.*'
+
+    @property
+    def parent(self) -> 'Reference':
+        return self.expression.parent.reference
+
+    @property
+    def void(self) -> 'Reference':
+        return dataclasses.replace(self, name=self.name + '.*', types=None)
+
+    @property
+    def expression(self) -> 'ReferenceExpression':
+        return self.to_reference_expression()
 
     def to_reference_expression(self) -> 'ReferenceExpression':
         path = self.name.split('.')
@@ -83,12 +94,16 @@ class Reference:
     def sanitize(self) -> 'Reference':
         return Reference(sanitize_reference_name(self.name), self.types)
 
-    def as_symbol(self) -> Symbol:
+    @property
+    def symbol(self):
         name = sanitize_reference_name(self.name)
         return symbols(f'REF_{this_pid}_{name}')
 
+    def as_symbol(self) -> Symbol:
+        return self.symbol
+
     @staticmethod
-    def decode(symbol:  Symbol) -> Union['Reference', Symbol]:
+    def decode(symbol:  Symbol|Expr) -> Union['Reference', Symbol]:
         result = ref_symbol_pattern.match(str(symbol))
         if result:
             refname = result.groupdict()['refname']
@@ -98,6 +113,9 @@ class Reference:
     @property
     def without_types(self) -> 'Reference':
         return dataclasses.replace(self, types=None)
+
+    def is_child_of(self, other: 'Reference') -> bool:
+        return self.name.startswith(other.name + '.')
 
     @property
     def id(self):
@@ -132,6 +150,18 @@ class Reference:
 
     def __rpow__(self, power, modulo=None):
         return self.as_symbol() ** power
+
+    def to_entity(self, value: Optional[FrozenSet | Number | str] = None) -> 'EntityValue':
+        from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+
+        match value:
+            case frozenset():
+                return EntityValue(value)
+            case None:
+                return EntityValue(frozenset())
+            case x:
+                return EntityValue(frozenset({x}))
+
 
 
 Ref = Reference
@@ -171,8 +201,8 @@ class ReferenceExpression:
     def void(prefix) -> 'ReferenceExpression':
         if prefix:
             as_strings = tuple(x.content for x in prefix[0])
-            return ReferenceExpression(as_strings + ('void',), None)
-        return ReferenceExpression(('void',))
+            return ReferenceExpression(as_strings + ('*',), None)
+        return ReferenceExpression(('*',))
 
     def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
         return ReferenceExpression(context + self.path, self.types if not ignore_types else frozenset())
@@ -185,6 +215,7 @@ class ReferenceExpression:
     @property
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:
         return frozenset({self})
+
 
 
 

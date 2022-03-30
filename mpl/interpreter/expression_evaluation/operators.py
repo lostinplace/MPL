@@ -2,8 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Callable, Any
 
-from mpl.lib.query_logic import query_negate, query_xor, query_and, query_or, query_eq, query_le, query_lt, query_ge, \
-    query_gt, query_ne
+from mpl.lib.query_logic import query_negate, query_xor, query_and, query_or
 
 
 class OperationType(Enum):
@@ -29,12 +28,12 @@ operations = [
     OperatorOperation('/', 7, OperationType.NumericAlgebra, lambda x, y: x / y),
     OperatorOperation('+', 6, OperationType.NumericAlgebra, lambda x, y: x + y),
     OperatorOperation('-', 6, OperationType.NumericAlgebra, lambda x, y: x - y),
-    OperatorOperation('==', 5, OperationType.Logical, query_eq),
-    OperatorOperation('!=', 5, OperationType.Logical, query_ne),
-    OperatorOperation('>', 5, OperationType.Logical, query_gt),
-    OperatorOperation('>=', 5, OperationType.Logical, query_ge),
-    OperatorOperation('<', 5, OperationType.Logical, query_lt),
-    OperatorOperation('<=', 5, OperationType.Logical, query_le),
+    OperatorOperation('==', 5, OperationType.Logical, lambda x, y: x == y),
+    OperatorOperation('!=', 5, OperationType.Logical, lambda x, y: x != y),
+    OperatorOperation('>', 5, OperationType.Logical, lambda x, y: x > y),
+    OperatorOperation('>=', 5, OperationType.Logical, lambda x, y: x >= y),
+    OperatorOperation('<', 5, OperationType.Logical, lambda x, y: x < y),
+    OperatorOperation('<=', 5, OperationType.Logical, lambda x, y: x <= y),
     OperatorOperation('^', 4, OperationType.Logical, query_xor),
     OperatorOperation('&', 3, OperationType.Logical, query_and),
     OperatorOperation('|', 2, OperationType.Logical, query_or),

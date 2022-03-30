@@ -5,11 +5,12 @@ from collections import defaultdict
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
-from mpl.interpreter.conflict_resolution import compress_conflict_list, identify_conflicts, resolve_conflicts, \
-    RuleConflict
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
+
 from mpl.interpreter.rule_evaluation import create_rule_interpreter
 from mpl.lib import fs
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+from mpl.lib.context_tree.context_tree_implementation import ContextTree
 
 
 def get_resolutions(conflicts, trials):
@@ -36,30 +37,32 @@ def assert_results_in_bounds(tracker: dict, expected_outcomes: dict):
 
 def get_interpretations(rule_inputs, context):
     interpretations = []
-    In = dict()
+    result = dict()
     for rule_input in rule_inputs:
         expression = quick_parse(RuleExpression, rule_input)
         interpreter = create_rule_interpreter(expression)
         interpreter = dataclasses.replace(interpreter, name=rule_input)
         interpretation = interpreter.interpret(context)
         interpretations.append(interpretation)
-        In[rule_input] = interpretation
-    return interpretations, In
+        result[rule_input] = interpretation
+    return frozenset(interpretations), result
 
 
-full_context = {
-    Reference('A'): MPLEntity('A', fs(1)),
-    Reference('B'): MPLEntity('B', fs(2)),
-    Reference('C'): MPLEntity('C', fs(3)),
-    Reference('D'): MPLEntity('D', fs(4)),
-    Reference('One'): MPLEntity('One', fs(5)),
-    Reference('Two'): MPLEntity('Two', fs(6)),
-    Reference('Three'): MPLEntity('Three', fs(7)),
-    Reference('Four'): MPLEntity('Four', fs(8)),
-    Reference('Five'): MPLEntity('Five', fs(9)),
-    Reference('Six'): MPLEntity('Six', fs(10)),
-    Reference('Seven'): MPLEntity('Seven', fs(11)),
+fc = {
+    Reference('A'): EntityValue(fs(1)),
+    Reference('B'): EntityValue(fs(2)),
+    Reference('C'): EntityValue(fs(3)),
+    Reference('D'): EntityValue(fs(4)),
+    Reference('One'): EntityValue(fs(5)),
+    Reference('Two'): EntityValue(fs(6)),
+    Reference('Three'): EntityValue(fs(7)),
+    Reference('Four'): EntityValue(fs(8)),
+    Reference('Five'): EntityValue(fs(9)),
+    Reference('Six'): EntityValue(fs(10)),
+    Reference('Seven'): EntityValue(fs(11)),
 }
+
+full_context = ContextTree.from_dict(fc)
 
 """
 Turn Start -> Turn Action
@@ -74,18 +77,17 @@ Turn Action -> %{spell damage} -> Spell
 """
 
 
-
 def test_conflict_resolution_simple_conflict():
 
-    A = 'One -> Two'
-    B = 'Two & Three -> Four'
-    C = 'Four -> Five'
-    D = 'Six -> Seven'
-    E = 'One -> Three -> Five'
+    a = 'One -> Two'
+    b = 'Two & Three -> Four'
+    c = 'Four -> Five'
+    d = 'Six -> Seven'
+    e = 'One -> Three -> Five'
 
-    rule_inputs = [A, B, C, D, E]
+    rule_inputs = [a, b, c, d, e]
 
-    interpretations, In = get_interpretations(rule_inputs, full_context)
+    interpretations, tmp = get_interpretations(rule_inputs, full_context)
 
     conflicts = identify_conflicts(interpretations)
 
@@ -95,9 +97,9 @@ def test_conflict_resolution_simple_conflict():
 
     resolution_tracker = get_resolutions(conflicts, trials)
 
-    outcome_1 = frozenset({In[A], In[C], In[D]})
-    outcome_2 = frozenset({In[B], In[D]})
-    outcome_3 = frozenset({In[E], In[D]})
+    outcome_1 = frozenset({tmp[a], tmp[c], tmp[d]})
+    outcome_2 = frozenset({tmp[b], tmp[d]})
+    outcome_3 = frozenset({tmp[e], tmp[d]})
 
     expected_outcomes = {
         outcome_1: 2,
@@ -109,14 +111,14 @@ def test_conflict_resolution_simple_conflict():
 
 
 def test_conflict_resolution_sequential_conflict():
-    A = 'One -> Two -> Three'
-    B = 'Three -> Four -> Five'
-    C = 'Five -> Six'
-    D = 'A -> B'
+    a = 'One -> Two -> Three'
+    b = 'Three -> Four -> Five'
+    c = 'Five -> Six'
+    d = 'A -> B'
 
-    rule_inputs = [A, B, C, D]
+    rule_inputs = [a, b, c, d]
 
-    interpretations, In = get_interpretations(rule_inputs, full_context)
+    interpretations, tmp = get_interpretations(rule_inputs, full_context)
 
     conflicts = identify_conflicts(interpretations)
 
@@ -124,8 +126,8 @@ def test_conflict_resolution_sequential_conflict():
 
     resolution_tracker = get_resolutions(conflicts, trials)
 
-    outcome_1 = frozenset({In[A], In[C], In[D]})
-    outcome_2 = frozenset({In[B], In[D]})
+    outcome_1 = frozenset({tmp[a], tmp[c], tmp[d]})
+    outcome_2 = frozenset({tmp[b], tmp[d]})
 
     expected_outcomes = {
         outcome_1: 2,
@@ -134,8 +136,4 @@ def test_conflict_resolution_sequential_conflict():
 
     assert_results_in_bounds(resolution_tracker, expected_outcomes)
 
-
-
-
 # TODO: test to make sure unequal distributions are handled correctly
-

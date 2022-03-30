@@ -6,35 +6,37 @@ from typing import Dict, List, Union, FrozenSet
 
 from sympy import Expr
 
+from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, Reference
 from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpression
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpression
 from mpl.Parser.Tokenizers.simple_value_tokenizer import NumberToken, StringToken
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.interpreter.expression_evaluation.operators import OperatorOperation, OperationType, \
     query_operations_dict
 from mpl.interpreter.expression_evaluation.types import symbolized_postfix_stack
 from mpl.interpreter.expression_evaluation.types import postfix_stack
-from mpl.lib.query_logic import MPL_Context, FinalResultSet, eval_expr_with_context
+from mpl.lib.query_logic import eval_expr_with_context
 
 
-def get_postfix_operand(operand, operation_dict: Dict[str, OperatorOperation]):
+def get_postfix_operand(operand: Expression, operation_dict: Dict[str, OperatorOperation]):
     match operand:
-        case ArithmeticExpression():
-            return postfix(operand, operation_dict)
-        case QueryExpression():
-            return postfix(operand, operation_dict)
-        case TextExpression():
-            return operand.operands[0].content
-        case NumberToken():
-            return literal_eval(operand.content)
-        case StringToken():
-            return operand.content
-        case ReferenceExpression():
-            return operand.reference.without_types
-        case TriggerExpression():
-            return operand.name.reference
+        case ArithmeticExpression() as x:
+            return postfix(x, operation_dict)
+        case QueryExpression() as x:
+            return postfix(x, operation_dict)
+        case TextExpression() as x:
+            return x.operands[0].content
+        case NumberToken() as x:
+            return literal_eval(x.content)
+        case StringToken() as x:
+            return x.content
+        case ReferenceExpression() as x:
+            return x.reference.without_types
+        case TriggerExpression() as x:
+            return x.name.reference
 
 
 def flat_append(out: List, operand: str | Number | Reference | List):
@@ -70,7 +72,7 @@ def postfix(
 
 def symbolize_postfix(postfix_stack: postfix_stack) -> symbolized_postfix_stack:
     index = 0
-    out_stack: symbolized_postfix_stack = []
+    out_stack = []
     while index < len(postfix_stack):
         this_item = postfix_stack[index]
         match this_item:
@@ -86,7 +88,7 @@ def symbolize_postfix(postfix_stack: postfix_stack) -> symbolized_postfix_stack:
             case x:
                 out_stack.append(x)
         index += 1
-    return out_stack
+    return tuple(out_stack)
 
 
 def symbolize_expression(
@@ -98,42 +100,38 @@ def symbolize_expression(
     return tuple(symbolized)
 
 
+#TODO: test this to ensure it works
 def evaluate_symbolized_postfix_stack(
         postfix_queue: symbolized_postfix_stack,
-        context: MPL_Context,
+        context: 'ContextTree',
         target=False
-) -> FinalResultSet:
-    index = 0
-    result: List[Union[Expr, OperatorOperation, FinalResultSet]] = list(postfix_queue)
+) -> EntityValue:
+
+    index: int = 0
+    result: List[int | str | Expr | EntityValue | OperatorOperation] = list(postfix_queue)
+
     while index < len(result):
         item = result[index]
         match item:
             case Number() | str():
-                result[index] = frozenset([item])
+                result[index] = EntityValue.from_value(item)
                 index += 1
             case Expr():
-                tmp = eval_expr_with_context(item, context, target)
-                result[index] = tmp
+                in_entity, out_entity = eval_expr_with_context(item, context)
+                result[index] = in_entity if not target else out_entity
                 index += 1
             case OperatorOperation() if item.operation_type == OperationType.Unary:
                 tmp = item.method(result[index - 1])
                 result[index - 1] = tmp
                 del result[index]
             case OperatorOperation():
-                if item.operation_type == OperationType.Logical:
-                    tmp = item.method(result[index - 2], result[index - 1])
-                elif item.operation_type == OperationType.NumericAlgebra:
-                    combinations = itertools.product(result[index - 2], result[index - 1])
-                    tmp = map(lambda x: item.method(*x), combinations)
-                    tmp = frozenset(tmp)
-                else:
-                    raise Exception("Unhandled operation type")
+                tmp = item.method(result[index - 2], result[index - 1])
                 result[index - 2] = tmp
                 del result[index - 1: index + 1]
                 index -= 1
 
     assert len(result) == 1
     out = result[0]
-    assert isinstance(out, FrozenSet)
-    simplified = filter(bool, out)
-    return frozenset(simplified)
+    assert isinstance(out, EntityValue)
+
+    return out.clean

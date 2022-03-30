@@ -11,8 +11,9 @@ from mpl.interpreter.expression_evaluation.stack_management import postfix, symb
 from mpl.interpreter.expression_evaluation.interpreters import query_operations_dict, \
     symbolize_expression, evaluate_symbolized_postfix_stack
 from mpl.interpreter.expression_evaluation.types import ChangeLedgerRef
-from mpl.interpreter.reference_resolution.mpl_entity import MPLEntity
+
 from mpl.lib import fs
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.lib.query_logic import eval_expr_with_context
 
 
@@ -68,8 +69,8 @@ def test_eval_expr():
         Reference('a'): 5,
         Reference('b'): 'test',
         Ref('state one'):
-            MPLEntity('state one', fs(5, -8.0, 'test')),
-        Reference('bank'): MPLEntity('bank', fs(3*red + 5*black)),
+            EntityValue(fs(5, -8.0, 'test')),
+        Reference('bank'): EntityValue(fs(3*red + 5*black)),
         Reference('cost'): 2 * red + 3 * uncolored,
 
     }
@@ -93,10 +94,10 @@ def test_query_expression_chain_evaluation():
     context = {
         Reference('test', None): 7,
         Reference('test two', None): 196,
-        Reference('bank'): MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): MPLEntity('Hurt', fs(1)),
-        Reference('Turn Ended'): MPLEntity('Turn Ended',  fs(1)),
-        Reference('Turn Started'): MPLEntity('Turn Ended', fs()),
+        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
+        Reference('Hurt'): EntityValue(fs(1)),
+        Reference('Turn Ended'): EntityValue( fs(1)),
+        Reference('Turn Started'): EntityValue(fs()),
     }
 
     expectations = {
@@ -128,16 +129,16 @@ def test_query_expression_interpreter_complex():
     context = {
         Reference('test', None): 7,
         Reference('test two', None): 196,
-        Reference('bank'): MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): MPLEntity('Hurt', fs(1)),
-        Reference('Turn Ended'): MPLEntity('Turn Ended', fs(1)),
-        Reference('Turn Started'): MPLEntity('Turn Ended', fs()),
-        Reference('void'): MPLEntity('*', fs(1)),
+        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
+        Reference('Hurt'): EntityValue(fs(1)),
+        Reference('Turn Ended'): EntityValue(fs(1)),
+        Reference('Turn Started'): EntityValue(fs()),
+        Reference('void'): EntityValue(fs(1)),
     }
 
     expectations = {
         '*': QueryResult(
-            fs(MPLEntity('*', fs(1))),
+            fs(EntityValue(fs(1))),
         ),
         'bank & (bank - (5*black))': QueryResult(
             fs(context[Ref('bank')], Ref('red') * 3)
@@ -158,31 +159,31 @@ def test_assignment_expression_interpreter():
         Reference('test'): 7,
         Reference('test two'): 196,
         Reference('test three'): fs(5),
-        Reference('bank'): MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): MPLEntity('Hurt', fs(1)),
-        Reference('Turn Ended'): MPLEntity('Turn Ended', fs(1)),
-        Reference('Turn Started'): MPLEntity('Turn Ended', fs()),
-        Reference('noise'): MPLEntity('noise', fs()),
+        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
+        Reference('Hurt'): EntityValue(fs(1)),
+        Reference('Turn Ended'): EntityValue(fs(1)),
+        Reference('Turn Started'): EntityValue(fs()),
+        Reference('noise'): EntityValue(fs()),
     }
 
     expectations = {
         'noise = `safe`': {
-            Reference('noise'): MPLEntity('noise', fs('safe')),
+            Reference('noise'): EntityValue(fs('safe')),
         },
         'test three *= 7': {
             Reference('test three'): fs(35)
         },
         'bank -= bank': {
-            Reference('bank'): MPLEntity('bank', fs())
+            Reference('bank'): EntityValue(fs())
         },
         'test two /= 8.0': {
             Reference('test two'): fs(N(24.5))
         },
         'bank = (bank - (5*black))': {
-            Reference('bank'): MPLEntity('bank', fs(3 * Ref('red')))
+            Reference('bank'): EntityValue(fs(3 * Ref('red')))
         },
         'bank += 1': {
-            Reference('bank'): MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black') + 1))
+            Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black') + 1))
         },
         'test *= 7': {
             Reference('test'): fs(49)
@@ -206,10 +207,10 @@ def test_scenario_expression_interpreter():
         Reference('test'): 7,
         Reference('test two'): 196,
         Reference('test three'): fs(5),
-        Reference('bank'): MPLEntity('bank', fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): MPLEntity('Hurt', fs(1)),
-        Reference('Turn Ended'): MPLEntity('Turn Ended', fs(1)),
-        Reference('Turn Started'): MPLEntity('Turn Ended', fs()),
+        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
+        Reference('Hurt'): EntityValue(fs(1)),
+        Reference('Turn Ended'): EntityValue(fs(1)),
+        Reference('Turn Started'): EntityValue(fs()),
     }
 
     expectations = {

@@ -4,6 +4,8 @@ from numbers import Number
 
 from typing import Dict, FrozenSet, Optional, Tuple, Set
 
+from sympy import Symbol
+
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, ReferenceExpression
 
 from mpl.interpreter.expression_evaluation.entity_value import EntityValue
@@ -11,9 +13,10 @@ from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 
 @dataclasses.dataclass(order=True)
 class ContextTreeNode:
-    ref: Reference
+    ref: Reference = Reference('ROOT')
     value: EntityValue = EntityValue()
     children: Dict[str, 'ContextTreeNode'] = dataclasses.field(default_factory=dict)
+    parent: Optional['ContextTreeNode'] = None
 
     def __getitem__(self, item: Reference) -> EntityValue:
         return get_value(self, item)
@@ -52,15 +55,12 @@ class ContextTree:
     root: ContextTreeNode = dataclasses.field(default_factory=ContextTreeNode)
     _keys: Optional[FrozenSet[Reference]] = None
 
+    # region Modifiers
+
+    # these are the only methods that should be used to modify the tree
+
     def clear(self, ref: Reference | FrozenSet[Reference]) -> Dict[Reference, EntityValue]:
         return clear_references(self.root, ref)
-
-    def __setitem__(self, key, value):
-        if key in self.__keys__():
-            return change_node(self.root, key, value)
-        else:
-            _keys = None
-            return add_child(self.root, key, value)
 
     def change(self, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
         return change_node(self.root, ref, value)
@@ -68,8 +68,20 @@ class ContextTree:
     def update(self, other: Dict[Reference, EntityValue]) -> Dict[Reference, EntityValue]:
         result = dict()
         for ref, value in other.items():
-            result |= self.change(ref, value)
+            new_value = None
+            match value:
+                case _, EntityValue() as new:
+                    new_value = new
+                case EntityValue() as new:
+                    new_value = new
+            result |= self.change(ref, new_value)
         return result
+
+    def add(self, ref: Reference, value: EntityValue):
+        add_child(self.root, ref, value)
+        self._keys = None
+
+    #endregion
 
     def __contains__(self, item: Reference):
         return item in self.__keys__()
@@ -82,12 +94,8 @@ class ContextTree:
     def __iter__(self):
         yield from self.root.__iter__()
 
-    def __getitem__(self, item: Reference) -> EntityValue:
+    def __getitem__(self, item: Reference) -> EntityValue | Symbol:
         return get_value(self.root, item)
-
-    def add(self, ref: Reference, value: EntityValue):
-        add_child(self.root, ref, value)
-        self._keys = None
 
     def to_dict(self):
         return tree_to_dict(self.root)
@@ -118,7 +126,6 @@ class OperationResult(Enum):
 
 
 def reference_is_child_of_reference(ref: Reference, potential_parent_ref: Reference) -> int:
-
     ref_expr = ref.expression
     ref_expr_length = len(ref_expr.path)
     if potential_parent_ref == Reference('ROOT'):
@@ -136,7 +143,6 @@ def reference_is_child_of_reference(ref: Reference, potential_parent_ref: Refere
 
 
 def get_intermediate_child_ref(parent: Reference, ref: Reference, stages: int) -> Reference:
-
     ref_expr_path = ref.expression.path
 
     parent_length = len(parent.expression.path)
@@ -161,7 +167,7 @@ def add_child(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Oper
             node.ref = dataclasses.replace(node.ref, types=ref.types | node.ref.types)
             return OperationResult.SUCCESS
         case 1:
-            new_node = ContextTreeNode(ref, value)
+            new_node = ContextTreeNode(ref, value, parent=node)
             node.children[ref.name] = new_node
             return OperationResult.SUCCESS
         case x if x > 1:
@@ -182,18 +188,26 @@ def refs_are_compatible(ref1: Reference, ref2: Reference) -> bool:
 
 
 def get_value(node: ContextTreeNode, ref: Reference) -> EntityValue:
+    node = get_node_by_ref(node, ref)
+    if node is None:
+        return EntityValue()
+    return node.entity
+
+
+def get_node_by_ref(node: ContextTreeNode, ref: Reference) -> Optional[ContextTreeNode]:
     if refs_are_compatible(ref, node.ref):
-        return node.entity
+        return node
     degree = reference_is_child_of_reference(ref, node.ref)
     if degree == -1:
-        return EntityValue()
+        return None
     if degree == 1 and ref.is_void:
-        return EntityValue.from_value(1) if not node.entity else EntityValue()
+        value = EntityValue.from_value(1) if not node.entity else EntityValue()
+        return ContextTreeNode(ref, value, parent=node)
     intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
     intermediate_child = node.children.get(intermediate_child_ref.name)
     if intermediate_child is None:
-        return EntityValue()
-    return get_value(intermediate_child, ref)
+        return None
+    return get_node_by_ref(intermediate_child, ref)
 
 
 def tree_from_dict(d: Dict[Reference, any]) -> ContextTreeNode:
@@ -226,8 +240,15 @@ def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Di
     if target_this_node and value:
         from_children = node.entity.without(node.value)
         not_handled_by_children = value.without(from_children)
+        old_void = node.void_value
         node.value = not_handled_by_children
-        return {node.ref: node.value}
+        output = {
+            node.ref: node.entity
+        }
+        new_void = node.void_value
+        if old_void != new_void:
+            output[node.ref.void] = new_void
+        return output
     elif target_this_node and not value:
         ref = node.ref.void
         value = EntityValue.from_value(1)
@@ -267,11 +288,13 @@ def clear_references(node: ContextTreeNode, references: FrozenSet[Reference]) ->
     return changes
 
 
-def copy_tree(node: ContextTreeNode) -> ContextTreeNode:
-    result = ContextTreeNode(node.ref)
+def copy_tree(node: ContextTreeNode | ContextTree, parent: Optional[ContextTreeNode] = None) -> ContextTreeNode:
+    if isinstance(node, ContextTree):
+        return copy_tree(node.root, None)
+    result = ContextTreeNode(node.ref, parent=parent)
     result.value = node.value
     result.children = {
-        child_name: copy_tree(child)
+        child_name: copy_tree(child, node)
         for child_name, child in node.children.items()
     }
     return result
@@ -295,22 +318,22 @@ def get_conflicts(context_a: EntityContext, context_b: EntityContext) \
     return conflicts
 
 
-def apply_changes(changes: Dict[Reference | str, EntityValue], tree: ContextTreeNode, in_place=False) \
-    -> Tuple['RuleInterpretationState', ContextTreeNode]:
+def apply_changes(changes: Dict[Reference | str, EntityValue], node: ContextTreeNode, in_place=True) \
+        -> Tuple['RuleInterpretationState', ContextTreeNode]:
     from mpl.interpreter.rule_evaluation import RuleInterpretationState
 
     if not in_place:
-        new_tree = copy_tree(tree)
+        new_node = copy_tree(node)
     else:
-        new_tree = tree
+        new_node = node
 
     result = {}
     for ref, value in changes.items():
         if isinstance(ref, str):
             ref = Reference(ref)
-        tmp = change_node(new_tree, ref, value)
+        tmp = change_node(new_node, ref, value)
         conflicts = get_conflicts(tmp, result)
         if conflicts:
-            return RuleInterpretationState.NOT_APPLICABLE, new_tree
+            return RuleInterpretationState.NOT_APPLICABLE, new_node
         result |= tmp
-    return RuleInterpretationState.APPLICABLE, new_tree
+    return RuleInterpretationState.APPLICABLE, new_node

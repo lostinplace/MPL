@@ -4,11 +4,10 @@ from typing import Tuple, FrozenSet, List
 
 from parsita import TextParsers, repsep
 
-from mpl.Parser.ExpressionParsers import Expression, T
+from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpressionParsers as QEP
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.interpreter.expression_evaluation.operators import query_operations_dict
-from mpl.interpreter.expression_evaluation.stack_management import postfix
 
 
 @dataclass(frozen=True, order=True)
@@ -42,6 +41,8 @@ class VectorExpression(Expression):
 
     @staticmethod
     def to_tuple(v) -> Tuple[Number | str, ...]:
+        from mpl.interpreter.expression_evaluation.stack_management import postfix
+
         # TODO: This only works for value-vectors
         result = []
         for expr in v.expressions:

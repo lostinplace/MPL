@@ -3,6 +3,7 @@ import random
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
+from mpl.interpreter.expression_evaluation.entity_value import ev_fv
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.lib import fs
 
@@ -20,21 +21,27 @@ def test_basic_operations():
     expressions = {quick_parse(RuleExpression, item) for item in rules_items if item.strip()}
 
     engine = MPLEngine()
-    engine.add(expressions)
+    engine = engine.add(expressions)
 
     actual = engine.tick()
     assert not actual
     diff = engine.activate(Ref('One'))
-    assert diff == {
-        'One': (
-            fs(),
-            fs(Ref('One').id
-        ))
+    expected_diff = {
+        Ref('One'): (
+            ev_fv(),
+            ev_fv(1)
+        ),
+        Ref('One.*'): (
+            ev_fv(1),
+            ev_fv(),
+        ),
     }
-    actual = engine.query(Ref('One'))
-    assert actual == fs(Ref('One').id)
+    assert diff == expected_diff
 
-    trials = 1000
+    actual = engine.query(Ref('One'))
+    assert actual == ev_fv(1)
+
+    trials = 100
     hit_5 = 0
     hit_two = 0
     random.seed(0)
@@ -66,11 +73,11 @@ def test_basic_operations():
 
 def test_evaluate_rule_from_wumpus_file():
     engine = MPLEngine.from_file('Tests/test_files/simple_wumpus.mpl')
-    testing = """Activity.Recover ~> Health.Hurt -> Health.Ok"""
+    # testing `Activity.Recover ~> Health.Hurt -> Health.Ok`
 
     tmp = engine.activate(Ref('Wumpus.Health.Hurt'))
     tmp = engine.activate(Ref('Wumpus.Activity.Recover'))
-    assert tmp
+
     assert engine.query(Ref('Wumpus.Health.Hurt'))
     assert engine.query(Ref('Wumpus.Activity.Recover'))
     tmp = engine.tick()

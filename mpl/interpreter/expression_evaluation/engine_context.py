@@ -2,39 +2,101 @@ import dataclasses
 from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
 
 from networkx import MultiDiGraph
+from sympy import Symbol
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretation
-from mpl.lib.context_tree.context_tree_implementation import ContextTree, apply_changes
+from mpl.lib.context_tree.context_tree_implementation import ContextTree
 
 ref_name = Union[str, Ref]
 
 context_diff = Dict[str, Tuple[Optional[EntityValue], Optional[EntityValue]]]
 
 
+def quick_diff(changes: Dict[Reference, EntityValue], old_context: ContextTree) -> context_diff:
+    return {
+        name: (old_context[name], changes.get(name))
+        for name in changes if name != Reference.ROOT()
+    }
+
+
 @dataclasses.dataclass
 class EngineContext:
+    """
+    EngineContext are immutable, any time you omake a change, you receive a new context along with the change manifest
+    """
     tree: ContextTree = ContextTree()
 
     def __getitem__(self, item: Reference) -> 'EntityValue':
         return self.tree[item]
 
-    def __setitem__(self, key: Reference, value: EntityValue):
-        match key:
+    # region Modifiers
+    # these methods return a new context with the changes applied
+
+    def add(self, ref: ref_name, value: EntityValue) -> Tuple['EngineContext', context_diff]:
+        new_tree = self.tree.__copy__()
+        new_tree.add(ref, value)
+        return EngineContext(new_tree), {}
+
+    def set(self, ref: ref_name, value: EntityValue) -> Tuple['EngineContext', context_diff]:
+        new_tree = self.tree.__copy__()
+        changes = new_tree.change(ref, value)
+        qd = quick_diff(changes, self.tree)
+        return EngineContext(new_tree), qd
+
+    def update(self, other: Dict[Reference, EntityValue] | 'EngineContext') -> Tuple['EngineContext', context_diff]:
+        new_tree = self.tree.__copy__()
+        match other:
+            case EngineContext():
+                other = other.to_dict()
+        changes = new_tree.update(other)
+        qd = quick_diff(changes, self.tree)
+        return EngineContext(new_tree), qd
+
+    def __or__(self, other: Dict[Reference, EntityValue] | 'EngineContext') -> 'EngineContext':
+        result, _ = self.update(other)
+        return result
+
+    def clear(self, ref: Reference | Set[Reference]) -> Tuple['EngineContext', context_diff]:
+        new_tree = self.tree.__copy__()
+        changes = new_tree.clear(ref)
+        qd = quick_diff(changes, self.tree)
+        return EngineContext(new_tree), qd
+
+    def activate(self, ref: ref_name | Set[ref_name], value=None) -> Tuple['EngineContext', context_diff]:
+        if value is None:
+            value = EntityValue.from_value(value or 1)
+
+        target_tree = self.tree.__copy__()
+        changes = {}
+        match ref:
             case Reference():
-                self.tree[key] = value
+                changes |= target_tree.change(ref, value)
+            case str():
+                return self.activate(Ref(ref), value)
+            case refs:
+                for ref in refs:
+                    changes |= target_tree.change(ref, value)
 
-    def update(self, other: Dict[Reference, EntityValue]) -> Dict[Reference, EntityValue]:
-        return self.tree.update(other)
+        qd = quick_diff(changes, self.tree)
+        return EngineContext(target_tree), qd
 
-    def clear(self, ref: Reference | Set[Reference]) -> Dict[Reference, EntityValue]:
-        return self.tree.clear(ref)
+    def deactivate(self, ref: ref_name | Set[ref_name]) -> Tuple['EngineContext', context_diff]:
+        return self.activate(ref, EntityValue())
+
+    # endregion
+
+    @property
+    def symbols(self) -> FrozenSet[Symbol]:
+        result = set()
+        for ref, value in self.tree:
+            if ref.types and 'symbol' in ref.types and not value:
+                result.add(ref.symbol)
+        return frozenset(result)
 
     @property
     def active(self) -> Dict[Reference, EntityValue]:
-        return {ref: value for ref, value in self.tree if value}
+        return {ref: value for ref, value in self.tree if value and not ref.is_void}
 
     @property
     def ref_names(self) -> FrozenSet[str]:
@@ -44,6 +106,11 @@ class EngineContext:
     def from_graph(graph: MultiDiGraph) -> 'EngineContext':
         references = frozenset({x for x in graph.nodes if isinstance(x, Reference)})
         return EngineContext.from_references(references)
+
+    @staticmethod
+    def from_dict(d: Dict[Reference, EntityValue]) -> 'EngineContext':
+        tree = ContextTree.from_dict(d)
+        return EngineContext(tree)
 
     @staticmethod
     def from_references(references: FrozenSet[Reference]) -> 'EngineContext':
@@ -56,38 +123,12 @@ class EngineContext:
         return result
 
     @staticmethod
-    def from_interpreter(interpreter: ExpressionInterpreter | RuleInterpreter) -> 'EngineContext':
+    def from_interpreter(interpreter: Union['ExpressionInterpreter', 'RuleInterpreter']) -> 'EngineContext':
         references = interpreter.references
         return EngineContext.from_references(references)
 
-    def activate(self, ref: ref_name | Set[ref_name], value=None) -> 'EngineContext':
-        value = EntityValue.from_value(value)
-        match ref:
-            case Reference():
-                new_tree = self.tree.__copy__()
-                new_tree[ref] |= value
-                return EngineContext(new_tree)
-            case str():
-                return self.activate(Ref(ref), value)
-            case refs:
-                new_tree = self.tree.__copy__()
-                for ref in refs:
-                    new_tree[ref] |= value
-                return EngineContext(new_tree)
-
-    def deactivate(self, ref: ref_name | Set[ref_name]) -> 'EngineContext':
-        return self.activate(ref, EntityValue())
-
     def to_dict(self) -> Dict[Reference, 'EntityValue']:
         return self.tree.to_dict()
-
-    def apply(self, interpretations: FrozenSet[RuleInterpretation]) -> 'EngineContext':
-        new_tree = self.tree.__copy__()
-        sum_of_changes = dict()
-        for interpretation in interpretations:
-            sum_of_changes |= interpretation.changes
-        apply_changes(sum_of_changes, new_tree)
-        return EngineContext(new_tree)
 
     @staticmethod
     def diff(
@@ -99,8 +140,12 @@ class EngineContext:
         all_keys = set(c1_dict.keys()) | set(c2_dict.keys())
         result = dict()
         for key in all_keys:
-            v1 = c1_dict.get(key)
-            v2 = c2_dict.get(key)
+            if key == Reference('ROOT'):
+                continue
+            v1 = c1_dict.get(key) or EntityValue()
+            v2 = c2_dict.get(key) or EntityValue()
+            if v1 == v2:
+                continue
             result[key.name] = (v1, v2)
 
         return result
@@ -120,3 +165,5 @@ class EngineContext:
     def __copy__(self):
         return EngineContext(self.tree.__copy__())
 
+    def __hash__(self):
+        return hash(self.tree)

@@ -14,7 +14,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
-from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
+from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflict_map
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file
@@ -192,7 +192,7 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             engine.context = rule_context | engine.context
             result = interpreter.interpret(engine.context)
             conflicts = identify_conflicts([result])
-            resolved = resolve_conflicts(conflicts)
+            resolved = resolve_conflict_map(conflicts, 1)
             result = engine.apply(resolved)
             return result
         case _:

@@ -15,7 +15,7 @@ from numbers import Number
 
 from sympy import Symbol, symbols, Expr
 from dataclasses import dataclass
-from typing import Optional, Tuple, Iterable, Union, List, FrozenSet, Dict
+from typing import Optional, Tuple, Union, List, FrozenSet, Dict
 
 from parsita import TextParsers, opt, repsep, Success, lit, longest
 from parsita.util import splat
@@ -41,6 +41,11 @@ ref_symbol_pattern = re.compile(pattern)
 class Reference:
     name: str
     types: Optional[FrozenSet[str]] = None
+
+    @staticmethod
+    def ROOT():
+        return Reference('ROOT')
+
 
     @property
     def types_str(self):
@@ -74,14 +79,6 @@ class Reference:
         path = self.name.split('.')
         return ReferenceExpression(tuple(path), self.types)
 
-    @property
-    def as_type_dict(self) -> Dict[str, 'Reference']:
-        result = {None: dataclasses.replace(self, types=None)}
-        if self.types:
-            for t in self.types:
-                result[t] = dataclasses.replace(self, types=frozenset({t}))
-        return result
-
     def __str__(self):
         types_str = self.types_str
         if types_str:
@@ -91,24 +88,13 @@ class Reference:
     def __repr__(self):
         return f'Reference({self})'
 
-    def sanitize(self) -> 'Reference':
-        return Reference(sanitize_reference_name(self.name), self.types)
-
     @property
     def symbol(self):
-        name = sanitize_reference_name(self.name)
-        return symbols(f'REF_{this_pid}_{name}')
-
-    def as_symbol(self) -> Symbol:
-        return self.symbol
+        return Symbol(self.name)
 
     @staticmethod
-    def decode(symbol:  Symbol|Expr) -> Union['Reference', Symbol]:
-        result = ref_symbol_pattern.match(str(symbol))
-        if result:
-            refname = result.groupdict()['refname']
-            return Reference(unsanitize_reference_name(refname))
-        return symbol
+    def decode(symbol:  Symbol) -> Union['Reference']:
+        return Reference(str(symbol))
 
     @property
     def without_types(self) -> 'Reference':
@@ -122,34 +108,34 @@ class Reference:
         return hash(self)
 
     def __add__(self, other):
-        return self.as_symbol() + other
+        return self.symbol + other
 
     def __radd__(self, other):
-        return self.as_symbol() + other
+        return self.symbol + other
 
     def __sub__(self, other):
-        return self.as_symbol() - other
+        return self.symbol - other
 
     def __rsub__(self, other):
-        return self.as_symbol() - other
+        return self.symbol - other
 
     def __mul__(self, other):
-        return self.as_symbol() * other
+        return self.symbol * other
 
     def __rmul__(self, other):
-        return self.as_symbol() * other
+        return self.symbol * other
 
     def __truediv__(self, other):
-        return self.as_symbol() / other
+        return self.symbol / other
 
     def __rtruediv__(self, other):
-        return self.as_symbol() / other
+        return self.symbol / other
 
     def __pow__(self, power, modulo=None):
-        return self.as_symbol() ** power
+        return self.symbol ** power
 
     def __rpow__(self, power, modulo=None):
-        return self.as_symbol() ** power
+        return self.symbol ** power
 
     def to_entity(self, value: Optional[FrozenSet | Number | str] = None) -> 'EntityValue':
         from mpl.interpreter.expression_evaluation.entity_value import EntityValue

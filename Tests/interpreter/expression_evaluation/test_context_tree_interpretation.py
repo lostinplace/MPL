@@ -1,27 +1,27 @@
-from random import Random
 from textwrap import dedent
-from typing import Dict, List, FrozenSet
+from typing import Dict
 
-from mpl.Parser.ExpressionParsers import Reference
+from sympy import symbols
+
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
-from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
-from mpl.interpreter.conflict_resolution import RuleConflict, resolve_conflicts, identify_conflicts, get_resolutions, \
-    normalize_tracker
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.interpreter.expression_evaluation.interpreters import target_operations_dict
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref, Reference
+from mpl.interpreter.conflict_resolution import identify_conflicts, get_resolutions, normalize_tracker
+from mpl.interpreter.expression_evaluation.engine_context import EngineContext
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
+from mpl.interpreter.expression_evaluation.interpreters.target_exprression_interpreter import target_operations_dict
 from mpl.interpreter.expression_evaluation.stack_management import symbolize_expression, \
     evaluate_symbolized_postfix_stack
 from mpl.interpreter.rule_evaluation import RuleInterpretation, RuleInterpretationState
 from mpl.lib import fs
 from mpl.lib.context_tree.context_tree_implementation import tree_from_dict, reference_is_child_of_reference, \
-    get_intermediate_child_ref, get_value, tree_to_dict, change_node
+    get_intermediate_child_ref, get_value, tree_to_dict, change_node, ContextTree
 
 
 def diff_trackers(tracker1, tracker2):
     all_keys = set(tracker1.keys()) | set(tracker2.keys())
     result = {}
     for k in all_keys:
-        if k =='total':
+        if k == 'total':
             continue
         v1 = tracker1.get(k, 0)
         v2 = tracker2.get(k, 0)
@@ -52,34 +52,34 @@ def test_evaluating_query_expression_with_context_tree():
 
     for expression, expected in expectations.items():
         symbolized = symbolize_expression(expression)
-        context = tree_from_dict(input_dict)
+        tree = ContextTree.from_dict(input_dict)
+        context = EngineContext(tree)
         result = evaluate_symbolized_postfix_stack(symbolized, context)
         assert result == expected, expression
 
 
 def test_evaluating_target_expression_with_context_tree():
     input_dict = {
-        Reference("a.b.c"): "value",
-        Reference("a"): 'test',
-        Reference("a.b.d"): 1,
-        Reference("a.b.e"): 2,
-        Reference("a.b.f"): None,
-        Reference("test.final"): 3,
-        Reference("test.*"): {},
-        Reference("test.temporary"): 3,
+        Reference("a.b.c"): ev_fv("value"),
+        Reference("a"): ev_fv('test'),
+        Reference("a.b.d"): ev_fv(1),
+        Reference("a.b.e"): ev_fv(2),
+        Reference("a.b.f"): ev_fv(),
+        Reference("test.final"): ev_fv(3),
+        Reference("test.*"): ev_fv(),
+        Reference("test.temporary"): ev_fv(3),
     }
 
     expectations = {
-        QueryExpression.parse("a.b.d & a.b"): EntityValue.from_value({Ref("a.b.d"), Ref("a.b"), 1, 2, 'value'}),
-        QueryExpression.parse("a.b.f ^ a.b.d-1"): EntityValue.from_value({Ref("a.b.f")}),
-        QueryExpression.parse("a.b.f | test.*"): EntityValue.from_value({Ref("a.b.f"), Ref("test.*")}),
+        QueryExpression.parse("a.b.f ^ a.b.d-1"): ev_fv(Ref("a.b.f")),
+        QueryExpression.parse("a.b.d & a.b"): ev_fv(Ref("a.b.d"), Ref("a.b"), 1, 2, symbols('`value`')),
     }
 
     for expression, expected in expectations.items():
         symbolized = symbolize_expression(expression, target_operations_dict)
-        context = tree_from_dict(input_dict)
-        result = evaluate_symbolized_postfix_stack(symbolized, context, True)
-        assert result == expected, expression
+        context = EngineContext.from_dict(input_dict)
+        actual = evaluate_symbolized_postfix_stack(symbolized, context)
+        assert actual.value == expected.value, expression
 
 
 def test_reference_child_determination():
@@ -256,8 +256,6 @@ def test_change_node():
         assert actual_dict == expected_dict
 
 
-
-
 def test_conflict_resolution_chain():
     def generate_conflict_dict(keys: set[str]) -> Dict[Reference, EntityValue]:
         return {key: EntityValue.from_value(1) for key in keys}
@@ -265,32 +263,25 @@ def test_conflict_resolution_chain():
     a = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'a', 'b', 'c'}), 'a->b-c')
     b = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'c', 'd', 'e'}), 'c->d->e')
     c = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'e', 'f', 'g'}), 'e->f->g')
-    d = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'h', 'i',    }), 'h->i')
+    d = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'h', 'i'}), 'h->i')
     e = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'a', 'c', 'e'}), 'a->c->e')
 
-    rng = Random()
-    rng.seed(1)
-
-
     interpretations = frozenset({a, b, c, d, e})
-
-    def resolver(conflicts: List[RuleConflict]) -> FrozenSet[RuleInterpretation]:
-        return resolve_conflicts(conflicts, rng)
 
     test_conflicts = identify_conflicts(interpretations)
 
     expectations = {
-        fs(a, c, d): 2,
+        fs(a, c, d): 1,
         fs(b, d): 1,
         fs(e, d): 1,
     }
-    normalized_expectations = {k: v / sum(expectations.values()) for k, v in expectations.items()}
+    normalized_expectations = normalize_tracker(expectations)
 
-    tracker = get_resolutions(test_conflicts, 1000, resolver)
+    resolution_tracker = get_resolutions(test_conflicts, 5000)
 
-    normalized_actual = normalize_tracker(tracker)
+    normalized_actual = normalize_tracker(resolution_tracker)
 
-    diff = diff_trackers(normalized_actual, normalized_expectations)
+    diff = diff_trackers(normalized_expectations, normalized_actual)
 
     for k, v in diff.items():
         assert abs(v) < 0.05, f"{k} -> {v}"

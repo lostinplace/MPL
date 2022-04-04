@@ -1,27 +1,29 @@
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 
-from sympy import abc, N, symbols
+from sympy import abc, N, symbols, Symbol
 
-from mpl.lib import fs
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.lib.query_logic import query_and, query_negate, query_or, query_xor, eval_expr_with_context, query_gt, \
-    query_lt, \
-    query_ge, query_le, query_eq, target_and, target_or, target_xor
+from mpl.interpreter.expression_evaluation.engine_context import EngineContext
+
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
+from mpl.lib.query_logic.expression_processing import entity_value_from_expression
+from mpl.lib.query_logic.query_operations import query_negate, query_and, query_or, query_xor
+from mpl.lib.query_logic.target_operations import target_and, target_xor, target_or
 
 red, black, uncolored = symbols('red black uncolored')
-bank = Reference('bank').as_symbol()
-cost = Reference('cost').as_symbol()
+bank = Reference('bank').symbol
+cost = Reference('cost').symbol
 
 
-context = {
-    Reference('a'): 5,
-    Reference('b'): 'test',
-    Reference('state one'):
-        EntityValue(fs(5, -8.0, 'test')),
-    Reference('bank'): EntityValue(fs(3 * red + 5 * black)),
+context_data = {
+    Reference('a'): ev_fv(5),
+    Reference('b'): ev_fv('test'),
+    Reference('state one'): ev_fv(5, -8.0, 'test'),
+    Reference('bank'): ev_fv(3 * red + 5 * black),
     Reference('cost'): 2 * red + 3 * uncolored,
-    Reference('notactive'): EntityValue(fs()),
-
+    Reference('notactive'): ev_fv(),
+    Ref('red', ev_fv('symbol')): ev_fv(),
+    Ref('black', ev_fv('symbol')): ev_fv(),
+    Ref('uncolored', ev_fv('symbol')): ev_fv(),
 }
 
 
@@ -32,304 +34,314 @@ def test_ref_symbol_relationship():
         Ref('with spaces test'): 2,
     }
 
-    test_sym = Ref('Random').as_symbol()
+    test_sym = Ref('Random').symbol
 
     from sympy import Symbol
     assert isinstance(test_sym, Symbol)
 
-    decoded = Reference.decode(Ref('Random'))
+    decoded = Reference.decode(Ref('Random').symbol)
     result = example_context.get(decoded)
     assert result == 1
 
 
-
 def test_ref_as_symbol_math():
-    expected = Ref('a').as_symbol() + Ref('b').as_symbol()
+    expected = Ref('a').symbol + Ref('b').symbol
     actual = Ref('a') + Ref('b')
     assert expected == actual
-    expected = Ref('a').as_symbol() + 3 + Ref('b').as_symbol()
+    expected = Ref('a').symbol + 3 + Ref('b').symbol
     actual = Ref('a') + 3 + Ref('b')
     assert expected == actual
 
 
 def test_eval_expr_with_context():
-    expectations = {
-        Reference('state one') - 5: fs(N(-13.0), symbols('test') - 5),
-        Ref('a') + Ref('b'): fs(symbols('test') + 5),
-        Ref('a') + 1: fs(6),
-        symbols('notactive'): fs(symbols('notactive')),
-        Reference('notactive').as_symbol(): fs(),
-        Reference('bank').as_symbol(): fs(context[Reference('bank')]),
-        abc.d: fs(abc.d),
-        Ref('a') + 3 + Ref('b'): fs(symbols('test') + 8),
+    context = EngineContext.from_dict(context_data)
 
-        bank - cost: fs(red + 5 * black - 3 * uncolored),
-        Ref('a')- 5: frozenset(),
+    expectations = {
+        Reference('bank').symbol: context[Reference('bank')] | Ref('bank'),
+        Reference('state one') - 5: ev_fv(N(-13.0), Symbol('`test`') - 5),
+        Ref('a') + Ref('b'): ev_fv(Symbol('`test`') + 5),
+        Ref('a') + 1: ev_fv(6),
+        Reference('notactive').symbol: ev_fv(Ref('notactive')),
+        abc.d: ev_fv(Ref('d')),
+        Ref('a') + 3 + Ref('b'): ev_fv(Symbol('`test`') + 8),
+
+        bank - cost: ev_fv(red + 5 * black - 3 * uncolored),
+        Ref('a') - 5: ev_fv(),
     }
 
+    for value, expected in expectations.items():
 
-    for input, expected in expectations.items():
-
-        actual = eval_expr_with_context(input, context)
-        assert actual == expected, input
+        actual = entity_value_from_expression(value, context)
+        assert actual == expected, value
 
 
 def test_logical_negate():
+    context = EngineContext.from_dict(context_data)
 
     expectations = {
-        context[Ref('notactive')]: fs(1),
-        symbols('bank'): fs(),
-        fs(6): frozenset(),
-        fs(abc.a + 3 + abc.b): frozenset(),
-        frozenset(): fs(1),
+        context[Ref('notactive')]: ev_fv(1),
+        symbols('bank'): ev_fv(),
+        ev_fv(6): ev_fv(),
+        ev_fv(abc.a + 3 + abc.b): ev_fv(),
+        ev_fv(): ev_fv(1),
     }
 
-    for input, expected in expectations.items():
-        actual = query_negate(input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = query_negate(value)
+        assert actual == expected, value
 
 
 def test_logical_and():
 
     expectations = {
-        (fs(1), fs(2, 3)): fs(1, 2, 3),
-        (fs(), fs(abc.a)): fs(),
-        (fs(), fs()): fs(),
+        (ev_fv(1), ev_fv(2, 3)): ev_fv(1, 2, 3),
+        (ev_fv(), ev_fv(abc.a)): ev_fv(),
+        (ev_fv(), ev_fv()): ev_fv(),
     }
 
-    for input, expected in expectations.items():
-        actual = query_and(*input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = query_and(*value)
+        assert actual == expected, value
 
 
 def test_logical_or():
     expectations = {
-        (fs(abc.d), fs(6)): fs(abc.d, 6),
-        (fs(abc.d), fs()): fs(abc.d),
-        (fs(abc.d), fs(1,2,3)): fs(abc.d,1,2,3),
-        (fs(), fs()): fs(),
+        (ev_fv(abc.d), ev_fv(6)): ev_fv(abc.d, 6),
+        (ev_fv(abc.d), ev_fv()): ev_fv(abc.d),
+        (ev_fv(abc.d), ev_fv(1, 2, 3)): ev_fv(abc.d, 1, 2, 3),
+        (ev_fv(), ev_fv()): ev_fv(),
     }
 
-    for input, expected in expectations.items():
-        actual = query_or(*input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = query_or(*value)
+        assert actual == expected, value
 
 
 def test_logical_xor():
     expectations = {
-        (fs(abc.d), fs(6)): fs(),
-        (fs(abc.d), fs()): fs(abc.d),
-        (fs(abc.d), fs(1, 2, 3)): fs(),
-        (fs(), fs()): fs(),
+        (ev_fv(abc.d), ev_fv(6)): ev_fv(),
+        (ev_fv(abc.d), ev_fv()): ev_fv(abc.d),
+        (ev_fv(abc.d), ev_fv(1, 2, 3)): ev_fv(),
+        (ev_fv(), ev_fv()): ev_fv(),
     }
 
-    for input, expected in expectations.items():
-        actual = query_xor(*input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = query_xor(*value)
+        assert actual == expected, value
 
 
 def test_target_and():
-    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(fs(cost_expr))
+    cost = ev_fv(cost_expr)
 
     expectations = {
-        (fs(1), fs(2, 3)): fs(),
-        (fs(bank), fs(abc.a)): fs(bank),
-        (fs(bank), fs()): fs(bank),
-        (fs(bank), fs(cost)): fs(bank, cost),
+        (ev_fv(1), ev_fv(2, 3)): ev_fv(1, 2, 3),
+        (ev_fv(bank), ev_fv(abc.a)): bank | abc.a,
+        (ev_fv(bank), ev_fv()): bank,
+        (ev_fv(bank), ev_fv(cost)): bank | cost,
     }
 
-    for input, expected in expectations.items():
-        actual = target_and(*input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = target_and(*value)
+        assert actual == expected, value
 
 
 def test_target_or():
-    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(fs(cost_expr))
-    empty = EntityValue(fs())
+    cost = ev_fv(cost_expr)
+    empty = ev_fv()
 
     expectations = {
-        (fs(1), fs(2, 3)): fs(),
-        (fs(bank), fs(abc.a)): fs(bank),
-        (fs(abc.a), fs(bank)): fs(bank),
-        (fs(bank), fs()): fs(bank),
-        (fs(bank), fs(empty)): fs(empty),
-        (fs(empty), fs(bank)): fs(empty),
-        (fs(bank), fs(cost)): fs(bank),
+        (ev_fv(1), ev_fv(2, 3)): ev_fv(1, 2, 3),
+        (bank, ev_fv(abc.a)): bank | abc.a,
+        (ev_fv(abc.a), bank): bank | abc.a,
+        (bank, ev_fv()): bank,
+        (bank, ev_fv(Ref('cost'))): bank,
+        (bank, empty): bank,
+        (empty, bank): bank,
+        (bank, cost): bank | cost,
     }
 
-    for input, expected in expectations.items():
-        actual = target_or(*input)
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        actual = target_or(*value)
+        equals_0 = actual == value[0]
+        equals_1 = actual == value[1]
+        assert equals_0 or equals_1, value
 
 
 def test_target_xor():
-    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(fs(cost_expr))
-    empty = EntityValue(fs())
-    empty_2 = EntityValue(fs())
+    cost = ev_fv(cost_expr)
+    empty = ev_fv()
+    empty_2 = ev_fv()
 
     expectations = {
-        (fs(1), fs(2, 3)): fs(),
-        (fs(), fs(2, 3)): fs(),
-        (fs(), fs()): fs(),
-        (fs(bank), fs(abc.a)): fs(),
-        (fs(bank), fs()): fs(bank),
-        (fs(), fs(bank)): fs(bank),
-        (fs(bank, cost), fs()): fs(bank, cost),
-        (fs(), fs(bank, cost)): fs(bank, cost),
-        (fs(bank), fs(empty)): fs(bank),
-        (fs(empty), fs(bank)): fs(bank),
-        (fs(empty), fs()): fs(empty),
-        (fs(empty_2), fs(empty)): fs(empty_2),
-        (fs(bank), fs(cost)): fs(),
-        (fs(bank, cost), fs(empty_2)): fs(bank, cost),
-        (fs(), fs(empty_2, empty)): fs(empty_2, empty),
+        (ev_fv(1), ev_fv(2, 3)): ev_fv(),
+        (ev_fv(), ev_fv(2, 3)): ev_fv(2, 3),
+        (ev_fv(), ev_fv()): ev_fv(),
+        (bank, ev_fv(abc.a)): ev_fv(),
+        (bank, ev_fv()): bank,
+        (ev_fv(), bank): bank,
+        (bank | cost, ev_fv()): bank | cost,
+        (ev_fv(), bank | cost): bank | cost,
+        (bank, empty): bank,
+        (empty, bank): bank,
+        (empty, ev_fv()): empty,
+        (empty_2, empty): empty_2,
+        (bank, ev_fv(cost)): ev_fv(),
+        (bank | cost, empty_2): bank | cost,
+        (ev_fv(), empty_2 | empty): empty_2 | empty,
     }
 
-    for index, input in enumerate(expectations):
-        expected = expectations[input]
-        actual = target_xor(*input)
+    for index, value in enumerate(expectations):
+        expected = expectations[value]
+        actual = target_xor(*value)
         assert actual == expected, index
 
 
 def test_logical_gt():
 
-    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(fs(cost_expr))
+    cost = ev_fv(cost_expr)
+    ev_fv(2 * red < -12, 2 * red < 20, 5 * black + 3 * red > 2 * red, 5 * black + 3 * red > 6.0)
 
     expectations = {
-        (fs(abc.d), fs()): fs(abc.d),
-        (fs(bank, -12, 20), fs(N(6), cost)): fs(),
-        (fs(bank, -12, 20), fs(6, cost)): fs(),
-        (fs(bank, -12, 20), fs(6, cost, 20)): fs(),
-        (fs(bank, 32, 20), fs(6, cost)): fs(bank, 32,20),
-        (fs(bank,  20), fs(6)): fs(bank,  20),
-        (fs(6), fs(12)): fs(),
-        (fs(abc.d), fs(6)): fs(abc.d > 6),
-        (fs(12), fs(6)): fs(12),
-        (fs(N(12)), fs(6)): fs(N(12)),
+        (ev_fv(abc.d), ev_fv()): ev_fv(abc.d),
+        (ev_fv(-12, 20) | bank, ev_fv(N(6)) | cost):
+            ev_fv({5*black + 3*red > 6.0, red < -6, red < 10, red > -5*black}),
+        (bank - cost, bank): ev_fv({red < 0}),
+        (ev_fv(32, 20) | bank, ev_fv(6) | cost): ev_fv(32, 20) | bank,
+        (bank | 20, ev_fv(6)): bank | 20,
+        (ev_fv(6), ev_fv(12)): ev_fv(),
+        (ev_fv(abc.d), ev_fv(6)): ev_fv(abc.d > 6),
+        (ev_fv(12), ev_fv(6)): ev_fv(12),
+        (ev_fv(N(12)), ev_fv(6)): ev_fv(N(12)),
 
     }
 
-    for input, expected in expectations.items():
-        actual = query_gt(input[0], input[1])
-        assert actual == expected, input
+    for value, expected in expectations.items():
+        x = ev_fv(value[0])
+        y = ev_fv(value[1])
+        actual = x > y
+        assert actual == expected, value
 
 
 def test_logical_eq():
     cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = EntityValue(fs(cost_expr))
-    cost = EntityValue(fs(cost_expr))
+    bank = EntityValue(ev_fv(cost_expr))
+    cost = EntityValue(ev_fv(cost_expr))
 
     expectations = {
-        (fs(bank), fs(cost)): fs(bank, cost),
-        (fs(12, bank), fs(N(12), bank)): fs(12, bank, N(12)),
-        (fs(12, 20), fs(12, 20)): fs(12, 20),
-        (fs(12, 20), fs(12, 20,6)): fs(),
-        (fs(12, 20, 6), fs(12, 20)): fs(),
-        (fs(12), fs(N(12))): fs(12, N(12)),
+        (bank, ev_fv(cost)): ev_fv(bank, cost),
+        (ev_fv(12, bank), ev_fv(N(12), bank)): ev_fv(12, bank, N(12)),
+        (ev_fv(12, 20), ev_fv(12, 20)): ev_fv(12, 20),
+        (ev_fv(12, 20), ev_fv(12, 20,6)): ev_fv(),
+        (ev_fv(12, 20, 6), ev_fv(12, 20)): ev_fv(),
+        (ev_fv(12), ev_fv(N(12))): ev_fv(12, N(12)),
     }
 
-    for input, expected in expectations.items():
-        actual = query_eq(input[0], input[1])
-        assert actual == expected, repr(input)
+    for value, expected in expectations.items():
+        x = ev_fv(value[0])
+        y = ev_fv(value[1])
+        actual = x == y
+        assert actual == expected, value
 
 
 def test_logical_inequality_comparisons():
 
-    bank = EntityValue(fs(3 * Ref('red') + 5 * Ref('black')))
+    bank = EntityValue(ev_fv(3 * Ref('red') + 5 * Ref('black')))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(fs(cost_expr))
+    cost = EntityValue(ev_fv(cost_expr))
 
     expectations = {
-        (fs(), fs(abc.d)): {
-            query_gt: fs(),
-            query_lt: fs(1),
-            query_ge: fs(),
-            query_le: fs(1),
+        (ev_fv(), ev_fv(abc.d)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(1),
+            EntityValue.__ge__: ev_fv(),
+            EntityValue.__le__: ev_fv(1),
         },
-        (fs(bank, -12, 20), fs(26, cost, 20)): {
-            query_gt: fs(),
-            query_lt: fs(),
-            query_ge: fs(),
-            query_le: fs(bank, -12, 20),
+        (ev_fv(bank, -12, 20), ev_fv(26, cost, 20)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(),
+            EntityValue.__le__: ev_fv(bank, -12, 20),
         },
-        (fs(bank, -12, 20), fs(N(6), cost)): {
-            query_gt: fs(),
-            query_lt: fs(),
-            query_ge: fs(),
-            query_le: fs(),
+        (ev_fv(bank, -12, 20), ev_fv(N(6), cost)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(bank, -12, 20), fs(6, cost)): {
-            query_gt: fs(),
-            query_lt: fs(),
-            query_ge: fs(),
-            query_le: fs(),
+        (ev_fv(bank, -12, 20), ev_fv(6, cost)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(bank, 32, 20), fs(6, cost)): {
-            query_gt: fs(bank, 32, 20),
-            query_lt: fs(),
-            query_ge: fs(bank, 32, 20),
-            query_le: fs(),
+        (ev_fv(bank, 32, 20), ev_fv(6, cost)): {
+            EntityValue.__gt__: ev_fv(bank, 32, 20),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(bank, 32, 20),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(bank,  20), fs(6)): {
-            query_gt: fs(bank, 20),
-            query_lt: fs(),
-            query_ge: fs(bank, 20),
-            query_le: fs(),
+        (ev_fv(bank,  20), ev_fv(6)): {
+            EntityValue.__gt__: ev_fv(bank, 20),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(bank, 20),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(bank, 20), fs(20)): {
-            query_gt: fs(),
-            query_lt: fs(),
-            query_ge: fs(bank, 20),
-            query_le: fs(bank, 20),
+        (ev_fv(bank, 20), ev_fv(20)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(bank, 20),
+            EntityValue.__le__: ev_fv(bank, 20),
         },
-        (fs(6), fs(12)): {
-            query_gt: fs(),
-            query_lt: fs(6),
-            query_ge: fs(),
-            query_le: fs(6),
+        (ev_fv(6), ev_fv(12)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(6),
+            EntityValue.__ge__: ev_fv(),
+            EntityValue.__le__: ev_fv(6),
         },
-        (fs(12), fs(12)): {
-            query_gt: fs(),
-            query_lt: fs(),
-            query_ge: fs(12),
-            query_le: fs(12),
+        (ev_fv(12), ev_fv(12)): {
+            EntityValue.__gt__: ev_fv(),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(12),
+            EntityValue.__le__: ev_fv(12),
         },
-        (fs(abc.d), fs(6)): {
-            query_gt: fs(abc.d > 6),
-            query_lt: fs(abc.d < 6),
-            query_ge: fs(abc.d >= 6),
-            query_le: fs(abc.d <= 6),
+        (ev_fv(abc.d), ev_fv(6)): {
+            EntityValue.__gt__: ev_fv(abc.d > 6),
+            EntityValue.__lt__: ev_fv(abc.d < 6),
+            EntityValue.__ge__: ev_fv(abc.d >= 6),
+            EntityValue.__le__: ev_fv(abc.d <= 6),
         },
-        (fs(abc.d), fs()): {
-            query_gt: fs(abc.d),
-            query_lt: fs(),
-            query_ge: fs(abc.d),
-            query_le: fs(),
+        (ev_fv(abc.d), ev_fv()): {
+            EntityValue.__gt__: ev_fv(abc.d),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(abc.d),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(12), fs(6)): {
-            query_gt: fs(12),
-            query_lt: fs(),
-            query_ge: fs(12),
-            query_le: fs(),
+        (ev_fv(12), ev_fv(6)): {
+            EntityValue.__gt__: ev_fv(12),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(12),
+            EntityValue.__le__: ev_fv(),
         },
-        (fs(N(12)), fs(6)): {
-            query_gt: fs(N(12)),
-            query_lt: fs(),
-            query_ge: fs(N(12)),
-            query_le: fs(),
+        (ev_fv(N(12)), ev_fv(6)): {
+            EntityValue.__gt__: ev_fv(N(12)),
+            EntityValue.__lt__: ev_fv(),
+            EntityValue.__ge__: ev_fv(N(12)),
+            EntityValue.__le__: ev_fv(),
         },
 
     }
 
-    for input, expected in expectations.items():
+    for value, expected in expectations.items():
         for op, expected_op in expected.items():
-            actual = op(input[0], input[1])
-            assert actual == expected_op, f'{repr(op)}, {repr(input)}'
+            x = ev_fv(value[0])
+            y = ev_fv(value[1])
+            actual = op(x, y)
+            assert actual == expected_op, value

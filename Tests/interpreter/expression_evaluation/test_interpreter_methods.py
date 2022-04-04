@@ -3,7 +3,8 @@ from mpl.Parser.ExpressionParsers.assignment_expression_parser import Assignment
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
-from mpl.interpreter.expression_evaluation.interpreters import create_expression_interpreter
+from mpl.interpreter.expression_evaluation.interpreters.create_expression_interpreter import \
+    create_expression_interpreter
 
 
 def test_get_references_from_assignment():

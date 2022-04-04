@@ -6,7 +6,8 @@ from networkx import MultiDiGraph
 from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
-from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflicts
+from mpl.interpreter.conflict_resolution import identify_conflicts, compress_interpretations, \
+    resolve_conflict_map
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph, \
@@ -33,78 +34,66 @@ class MPLEngine:
         interpreters = {RuleInterpreter.from_expression(rule) for rule in rule_expressions}
         return MPLEngine(interpreters, context, (), graph)
 
-    def add(self, rules: RuleExpression | Set[RuleExpression], inplace=True) -> 'MPLEngine':
-
+    def add(self, rules: RuleExpression | Set[RuleExpression]) -> 'MPLEngine':
         if not isinstance(rules, Iterable):
             rules = {rules}
 
         new_graph = construct_graph_from_expressions(rules)
         graph = combine_graphs(self.graph, new_graph)
-        context = EngineContext.from_graph(graph) | self.context
-        interpreters = {RuleInterpreter.from_expression(rule) for rule in rules} | self.rule_interpreters
+        new_context = EngineContext.from_graph(graph)
+        context, changes = new_context.update(self.context)
 
-        if inplace:
-            self.context = context
-            self.rule_interpreters = interpreters
-            self.graph = graph
-            return self
+        interpreters = {RuleInterpreter.from_expression(rule) for rule in rules} | self.rule_interpreters
 
         return MPLEngine(interpreters, context, self.history, graph)
 
-    def remove(self, rules: RuleExpression | Set[RuleExpression], inplace=True) -> 'MPLEngine':
+    def remove(self, rules: RuleExpression | Set[RuleExpression]) -> 'MPLEngine':
         if not isinstance(rules, Iterable):
             rules = {rules}
 
-        new_interpreters = {interpreter for interpreter in self.rule_interpreters if interpreter.expression not in rules}
+        new_interpreters = \
+            {interpreter for interpreter in self.rule_interpreters if interpreter.expression not in rules}
         expressions = {interpreter.expression for interpreter in new_interpreters}
         new_graph = drop_from_graph(expressions, self.graph)
 
-        if inplace:
-            self.rule_interpreters = new_interpreters
-            self.graph = new_graph
-            return self
-
         return MPLEngine(new_interpreters, self.context, self.history, new_graph)
 
-    def execute_expression(self, expression: RuleExpression) -> Dict[str, Tuple[Any, Any]]:
-        original_context = self.context
+    def execute_expression(self, expression: RuleExpression) -> Dict[Reference, context_diff]:
         interpreter = RuleInterpreter.from_expression(expression)
-        result = interpreter.interpret(self.context)
+        new_context = EngineContext.from_references(interpreter.references)
+        all_changes = dict()
+        context, changes = new_context.update(self.context)
+        all_changes |= changes
+
+        result = interpreter.interpret(context)
         if result.state != RuleInterpretationState.APPLICABLE:
             return dict()
-        conflicts = identify_conflicts({result})
-        resolved = resolve_conflicts(conflicts)
-        self.apply(resolved)
-        output = original_context.get_diff(self.context)
-        self.history = (output,) + self.history
-        return output
+        conflicts = identify_conflicts(fs(result))
+        resolved = resolve_conflict_map(conflicts, 1)
+        resolved_changes = compress_interpretations(resolved)
+        context, changes = context.update(resolved_changes)
+        all_changes |= changes
+        self.history = (all_changes,) + self.history
+        return all_changes
 
-    def execute_interpreters(self, interpreters: Set[RuleInterpreter]) -> Dict[str, Tuple[Any, Any]]:
-        original_context = self.context
+    def execute_interpreters(self, interpreters: FrozenSet[RuleInterpreter]) -> context_diff:
+
         interpretations = {interpreter.interpret(self.context) for interpreter in interpreters}
-        applicable = {x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE}
+        applicable = frozenset({x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE})
         if not applicable:
             return dict()
         conflicts = identify_conflicts(applicable)
-        resolved = resolve_conflicts(conflicts)
-        self.apply(resolved)
-        output = original_context.get_diff(self.context)
-        return output
+        resolved = resolve_conflict_map(conflicts, 1)
+        resolved_changes = compress_interpretations(resolved)
+        self.context, changes = self.context.update(resolved_changes)
+        return changes
 
-    def apply(self, interpretations: FrozenSet[RuleInterpretation]):
-        original_context = self.context
-        new_context = self.context.apply(interpretations)
-        self.context = new_context
-        return original_context.get_diff(self.context)
-
-    def tick(self, count: int = 1) -> Dict[str, Tuple[Any, Any]]:
-        original_context = self.context
+    def tick(self, count: int = 1) -> context_diff:
         output = dict()
         if count > 0:
             #  tick forward
             for tick in range(count):
-                self.execute_interpreters(self.rule_interpreters)
-            output = original_context.get_diff(self.context)
+                output |= self.execute_interpreters(frozenset(self.rule_interpreters))
             self.history = (output,) + self.history
         elif count < 0:
             # tick backward
@@ -112,9 +101,8 @@ class MPLEngine:
                 this_tick = self.history[0]
                 self.history = self.history[1:]
                 resolved = MPLEngine.invert_diff(this_tick)
-                self.apply(resolved)
-            output = original_context.get_diff(self.context)
-
+                resolved_changes = compress_interpretations(resolved)
+                self.context, output = self.context.update(resolved_changes)
         return output
 
     @staticmethod
@@ -133,34 +121,24 @@ class MPLEngine:
         return fs(interpretation)
 
     def activate(self, ref: Reference | Set[Reference],  value: Any = None) -> context_diff:
-        old_context = self.context
-        new_context = old_context.activate(ref, value)
-        self.context = new_context
-        return old_context.get_diff(new_context)
+
+        self.context, changes = self.context.activate(ref, value)
+        return changes
 
     def deactivate(self, ref: Reference | Set[Reference]) -> context_diff:
-        old_context = self.context
-        new_context = old_context.deactivate(ref)
-        self.context = new_context
-        return old_context.get_diff(new_context)
+        self.context, changes = self.context.deactivate(ref)
+        return changes
 
-    def query(self, ref: Reference):
-        from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-
-        value = self.context.get(ref)
-        match value:
-            case EntityValue():
-                return value.value
-            case _:
-                return value
+    def query(self, ref: Reference) -> 'EntityValue':
+        value = self.context[ref]
+        return value
 
     @property
-    def active(self) -> Dict[Reference, FrozenSet]:
+    def active(self) -> Dict[Reference, 'EntityValue']:
         return self.context.active
 
     def __hash__(self):
-        context_set = frozenset(self.context.items())
+        context_hash = hash(self.context)
         edges = self.graph.edges(data='relationship')
         edges_as_set = frozenset(edges)
-        return hash((context_set, frozenset(self.rule_interpreters), edges_as_set, self.history))
-
+        return hash((context_hash, frozenset(self.rule_interpreters), edges_as_set, self.history))

@@ -123,7 +123,7 @@ def machine_file_context_to_engine_context(context: Dict[ReferenceExpression, Fr
     result = EngineContext()
     for ref_x, value in context.items():
         ref = ref_x.reference
-        result[ref.without_types] = EntityValue(value)
+        result, _ = result.add(ref, EntityValue(value))
     return result
 
 
@@ -293,7 +293,7 @@ def engine_to_string(engine: 'MPLEngine') -> str:
     return result
 
 
-def get_sibling_groups(G: MultiDiGraph) -> Dict[Reference: Set[Reference]]:
+def get_sibling_groups(G: MultiDiGraph) -> Dict[Reference, Set[Reference]]:
     refs = {x for x in G.nodes() if isinstance(x, Reference) and not x.is_void}
     result = dict()
     for ref in refs:

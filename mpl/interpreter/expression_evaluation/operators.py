@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Callable, Any
 
-from mpl.lib.query_logic import query_negate, query_xor, query_and, query_or
+from mpl.lib.query_logic.query_operations import query_negate, query_and, query_or, query_xor
 
 
 class OperationType(Enum):

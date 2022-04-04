@@ -11,11 +11,13 @@ from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
-from mpl.interpreter.expression_evaluation.interpreters import AssignmentResult, create_expression_interpreter, \
-    QueryResult, ScenarioResult, TargetResult
-
-from mpl.lib.context_tree.context_tree_implementation import ContextTree, clear_references, apply_changes
+from mpl.interpreter.expression_evaluation.interpreters.assignment_expression_interpreter import AssignmentResult
+from mpl.interpreter.expression_evaluation.interpreters.create_expression_interpreter import \
+    create_expression_interpreter
+from mpl.interpreter.expression_evaluation.interpreters.expression_interpreter import ExpressionInterpreter
+from mpl.interpreter.expression_evaluation.interpreters.query_expression_interpreter import QueryResult
+from mpl.interpreter.expression_evaluation.interpreters.scenario_expression_interpreter import ScenarioResult
+from mpl.interpreter.expression_evaluation.interpreters.target_exprression_interpreter import TargetResult
 
 entry_ledger_key = Reference('{}')
 scenario_ledger_key = Reference('{scenario}')
@@ -43,7 +45,7 @@ class RuleInterpretation:
             match scenario:
                 case ScenarioResult(weight=x):
                     total_weight += x
-                case Number(x):
+                case Number() as x:
                     total_weight += x
 
         return total_weight or 1
@@ -79,7 +81,7 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
     from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
     this_name = str(expression)
 
-    result_context = context.__copy__()
+    result_context = context
     operation_pairs = itertools.zip_longest(interpreters, self.operators)
     result_cache = []
     all_changes = {}
@@ -92,18 +94,23 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
             case QueryResult() as x, MPLOperator() if not x.value:
                 return RuleInterpretation(RuleInterpretationState.NOT_APPLICABLE, {}, this_name)
             case QueryResult(), MPLOperator(_, 'CONSUME', __, _):
-                all_changes |= result_context.clear(result.value.references)
+                result_context, changes = result_context.clear(result.value.references)
+                all_changes |= changes
                 result_cache.append(result.value)
             case QueryResult(), MPLOperator(_, 'OBSERVE', __, _):
                 result_cache.append(EntityValue.from_value(1))
             case AssignmentResult() as x, None:
-                all_changes |= result_context.update(x.change)
+                result_context, changes = result_context.update(x.change)
+                all_changes |= changes
             case AssignmentResult() as x, MPLOperator(_, 'OBSERVE', __, _):
-                all_changes |= result_context.update(x.change)
+                result_context, changes = result_context.update(x.change)
+                all_changes |= changes
                 result_cache.append(EntityValue.from_value(1))
             case AssignmentResult() as x, MPLOperator(_, 'CONSUME', __, _):
-                all_changes |= result_context.update(x.change)
-                all_changes |= result_context.clear(x.value.references)
+                result_context, changes = result_context.update(x.change)
+                all_changes |= changes
+                result_context, changes = result_context.clear(x.change.references)
+                all_changes |= changes
                 result_cache.append(x.value)
             case ScenarioResult() as x, MPLOperator(_, 'CONSUME', __, _):
                 # TODO: this isn't right.  When a scenario is consumed, its selection probability should decrease
@@ -118,7 +125,8 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
                 target_refs = x.value.references
                 target_value = compress_result_cache(result_cache)
                 target_changes = {ref: target_value for ref in target_refs}
-                all_changes |= result_context.update(target_changes)
+                result_context, changes = result_context.update(target_changes)
+                all_changes |= changes
 
     return RuleInterpretation(RuleInterpretationState.APPLICABLE, all_changes, this_name, scenarios)
 
@@ -130,7 +138,7 @@ class RuleInterpreter:
     name: Optional[str] = None
     expression: Optional[RuleExpression] = None
 
-    def interpret(self, context: ContextTree) -> RuleInterpretation:
+    def interpret(self, context: EngineContext) -> RuleInterpretation:
         return interpret(self, context, self.expression_interpreters, self.expression)
 
     @property

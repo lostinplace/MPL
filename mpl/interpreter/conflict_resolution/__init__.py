@@ -1,11 +1,12 @@
 import dataclasses
 import random
-from typing import List, Set, FrozenSet, Dict, Optional
+
+from typing import List, Set, FrozenSet, Dict
 
 import networkx as nx
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
-from mpl.interpreter.rule_evaluation import RuleInterpretation
+from mpl.interpreter.rule_evaluation import RuleInterpretation, RuleInterpretationState
 
 
 def compress_conflict_list(query_conflicts: List[Set[RuleInterpretation]]) -> List[Set[RuleInterpretation]]:
@@ -30,27 +31,32 @@ class RuleConflict:
 
 
 @dataclasses.dataclass(frozen=True, order=True)
-class Resolutions:
-    Truth: FrozenSet[RuleInterpretation] = frozenset()
-    Falsehood: FrozenSet[RuleInterpretation] = frozenset()
+class InterpretationChoices:
+    Accepted: FrozenSet[RuleInterpretation] = frozenset()
+    Rejected: FrozenSet[RuleInterpretation] = frozenset()
 
 
-def identify_conflicts(interpretations: FrozenSet[RuleInterpretation]) -> List[RuleConflict]:
+def identify_conflicts(interpretations: FrozenSet[RuleInterpretation]) \
+        -> Dict[RuleInterpretation, FrozenSet[RuleInterpretation]]:
     affected_keys = set()
     interp_index = dict()
 
     tmp_graph = nx.DiGraph()
 
     for interp in interpretations:
+        if interp.state == RuleInterpretationState.NOT_APPLICABLE:
+            continue
         affected_keys |= interp.changes.keys()
         interp_key = hash(interp)
         interp_index[interp_key] = interp
         for changed_key in interp.keys:
             tmp_graph.add_edge(interp_key, changed_key)
 
-    out = list()
+    out = {}
 
     for interp in interpretations:
+        if interp.state == RuleInterpretationState.NOT_APPLICABLE:
+            continue
 
         changed_keys = interp.keys
         changed_key_nodes = tmp_graph.nbunch_iter(changed_keys)
@@ -61,73 +67,74 @@ def identify_conflicts(interpretations: FrozenSet[RuleInterpretation]) -> List[R
 
         result = changed_by - {hash(interp)}
         result = {interp_index[x] for x in result}
-        tmp = RuleConflict(interp, frozenset(result))
-        out.append(tmp)
+        out[interp] = frozenset(result)
 
-    out = sorted(out, key=lambda x: len(x.conflicting_interpretations), reverse=True)
     return out
 
 
-def resolve_conflict(
-        conflict: RuleConflict,
-        resolutions: Resolutions = Resolutions(),
-        rng: Optional[random.Random] = None
-) -> Resolutions:
-    if rng is None:
-        rng = random.Random()
+def choose_outcome(
+        target: RuleInterpretation,
+        conflict_map: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]],
+        existing_choices: InterpretationChoices,
+        seed) -> InterpretationChoices:
 
-    remaining_conflicts = conflict.conflicting_interpretations - resolutions.Falsehood
+    if target in existing_choices.Rejected:
+        return existing_choices
+
+    conflicting_interpretations = conflict_map[target]
+
+    if target in existing_choices.Accepted:
+        new_rejections = existing_choices.Rejected | conflicting_interpretations
+        return dataclasses.replace(existing_choices, Rejected=new_rejections)
+
+    remaining_conflicts = conflicting_interpretations - existing_choices.Rejected
+    if remaining_conflicts & existing_choices.Accepted:
+        new_rejections = existing_choices.Rejected | {target}
+        return dataclasses.replace(existing_choices, Rejected=new_rejections)
+
     if not remaining_conflicts:
-        new_truth = resolutions.Truth | {conflict.target_interpretation}
-        return dataclasses.replace(resolutions, Truth=new_truth)
+        new_acceptance = existing_choices.Accepted | {target}
+        return dataclasses.replace(existing_choices, Accepted=new_acceptance)
 
-    if remaining_conflicts.intersection(resolutions.Truth):
-        new_falsehood = resolutions.Falsehood | {conflict.target_interpretation}
-        return dataclasses.replace(resolutions, Falsehood=new_falsehood)
+    rc_list = list(remaining_conflicts)
+    rc_weights = [x.scenario_weight for x in rc_list]
 
-    conflict_weight = sum(x.scenario_weight for x in remaining_conflicts)
-    this_weight = conflict.target_interpretation.scenario_weight
-    choices = [conflict.target_interpretation,  remaining_conflicts]
-    weights = [this_weight, conflict_weight]
-    resolution = rng.choices(choices, weights=weights, k=1)[0]
-    match resolution:
-        case x if x == remaining_conflicts:
-            new_falsehood = resolutions.Falsehood | {conflict.target_interpretation}
-            return dataclasses.replace(resolutions, Falsehood=new_falsehood)
-        case conflict.target_interpretation:
-            new_truth = resolutions.Truth | {conflict.target_interpretation}
-            return dataclasses.replace(resolutions, Truth=new_truth)
+    candidates = [target] + rc_list
+    weights = [target.scenario_weight] + rc_weights
+    random.seed(seed)
+    choice = random.choices(candidates, weights=weights, k=1)[0]
+
+    new_acceptance = existing_choices.Accepted | {choice}
+    new_rejections = existing_choices.Rejected | conflict_map[choice]
+
+    result = dataclasses.replace(existing_choices, Accepted=new_acceptance, Rejected=new_rejections)
+    return result
 
 
-def resolve_conflicts(
-        conflicts: List[RuleConflict],
-        rng: Optional[random.Random] = None
-) -> FrozenSet[RuleInterpretation]:
-    if rng is None:
-        rng = random.Random()
-
-    resolutions = Resolutions()
-
-    for conflict in conflicts:
-        resolutions = resolve_conflict(conflict, resolutions, rng)
-
-    return frozenset(resolutions.Truth)
+def resolve_conflict_map(
+        conflict_map: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]],
+        seed) -> FrozenSet[RuleInterpretation]:
+    out = InterpretationChoices()
+    sorted_keys = sorted(conflict_map.keys(), key=lambda x: len(conflict_map[x]))
+    for k in sorted_keys:
+        out = choose_outcome(k, conflict_map, out, seed)
+    return out.Accepted
 
 
 def compress_interpretations(interpretations: FrozenSet[RuleInterpretation]) \
-        -> Dict[Reference, FrozenSet[RuleInterpretation]]:
+        -> Dict[Reference, 'EntityValue']:
     result = {}
     for interp in interpretations:
         result |= interp.changes
     return result
 
 
-def get_resolutions(conflicts, trials, conflict_resolver):
+def get_resolutions(conflicts: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]], trials):
     from collections import defaultdict
     resolution_tracker = defaultdict(lambda: 0)
-
+    random.seed(0)
     for x in range(trials):
-        resolved = conflict_resolver(conflicts)
+        resolved = resolve_conflict_map(conflicts, x)
         resolution_tracker[resolved] += 1
         resolution_tracker['total'] += 1
 
@@ -135,4 +142,10 @@ def get_resolutions(conflicts, trials, conflict_resolver):
 
 
 def normalize_tracker(tracker):
-    return {k: v / tracker['total'] for k, v in tracker.items()}
+    total = 0
+    if 'total' in tracker:
+        total = tracker['total']
+        del tracker['total']
+    else:
+        total = sum(tracker.values())
+    return {k: v / total for k, v in tracker.items()}

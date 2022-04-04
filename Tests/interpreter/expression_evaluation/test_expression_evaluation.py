@@ -1,28 +1,34 @@
-from sympy import symbols, N
+from sympy import symbols, N, Symbol
 
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
-from mpl.interpreter.expression_evaluation.interpreters import AssignmentResult, create_expression_interpreter, \
-    QueryResult, ScenarioResult
-from mpl.interpreter.expression_evaluation.stack_management import postfix, symbolize_postfix
-from mpl.interpreter.expression_evaluation.interpreters import query_operations_dict, \
-    symbolize_expression, evaluate_symbolized_postfix_stack
+from mpl.interpreter.expression_evaluation.engine_context import EngineContext
+
+from mpl.interpreter.expression_evaluation.interpreters.create_expression_interpreter import \
+    create_expression_interpreter
+from mpl.interpreter.expression_evaluation.interpreters.query_expression_interpreter import QueryResult
+from mpl.interpreter.expression_evaluation.interpreters.scenario_expression_interpreter import ScenarioResult
+from mpl.interpreter.expression_evaluation.operators import query_operations_dict
+from mpl.interpreter.expression_evaluation.stack_management import postfix, symbolize_postfix, symbolize_expression, \
+    evaluate_symbolized_postfix_stack
 from mpl.interpreter.expression_evaluation.types import ChangeLedgerRef
 
 from mpl.lib import fs
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.lib.query_logic import eval_expr_with_context
-
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
+from mpl.lib.query_logic.expression_processing import entity_value_from_expression, ev_is_simplified, \
+    expression_is_simplified
 
 
 def opr(x):
+    from mpl.interpreter.expression_evaluation.operators import query_operations_dict
     return query_operations_dict[x]
 
 
 def test_postfix():
+    from mpl.interpreter.expression_evaluation.operators import query_operations_dict
 
     expectations = {
         'first & !second ^ third - 4 * 5 | sixth':
@@ -37,8 +43,8 @@ def test_postfix():
         '4+3 & test': [4, 3, opr('+'), Reference('test'), opr('&')],
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(QueryExpression, input)
+    for entry, expected in expectations.items():
+        expr = quick_parse(QueryExpression, entry)
         actual = postfix(expr, operation_dict=query_operations_dict)
         assert actual == expected
 
@@ -51,102 +57,117 @@ def test_postfix_symbolization():
     test_two_ref = Reference('test two')
 
     expectations = {
-        '!test & test two * 7': [test_ref.as_symbol(), opr('!'), test_two_ref.as_symbol() * 7, opr('&')],
+        '!test & test two * 7': (test_ref.symbol, opr('!'), test_two_ref.symbol * 7, opr('&')),
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(QueryExpression, input)
+    for entry, expected in expectations.items():
+        expr = quick_parse(QueryExpression, entry)
         tmp = postfix(expr, query_operations_dict)
         actual = symbolize_postfix(tmp)
         assert actual == expected
 
 
 def test_eval_expr():
-    from sympy import abc, N
+    from sympy import N
     red, black, uncolored = symbols('red black uncolored')
 
     context = {
-        Reference('a'): 5,
-        Reference('b'): 'test',
+        Reference('a'): ev_fv(5),
+        Reference('b'): ev_fv('test'),
         Ref('state one'):
-            EntityValue(fs(5, -8.0, 'test')),
-        Reference('bank'): EntityValue(fs(3*red + 5*black)),
-        Reference('cost'): 2 * red + 3 * uncolored,
-
+            ev_fv(5, -8.0, 'test'),
+        Reference('bank'): ev_fv(3*red + 5*black),
+        Reference('cost'): ev_fv(2 * red + 3 * uncolored),
+        Ref('red', fs('symbol')): ev_fv(),
+        Ref('black', fs('symbol')): ev_fv(),
+        Ref('uncolored', fs('symbol')): ev_fv(),
     }
 
     expectations = {
-        Ref('bank').as_symbol() - Ref('cost').as_symbol(): fs(red + 5 * black - 3 * uncolored),
-        Ref('state one').as_symbol() - 5: fs(N(-13.0), symbols('test') - 5),
-        Ref('a').as_symbol(): {5},
-        abc.a + 1: fs(abc.a + 1),
-        Ref('a').as_symbol() + 1: fs(6),
-        Ref('a').as_symbol() + 3 + Ref('b').as_symbol(): fs(symbols('test') + 8),
+        Ref('a').symbol + 3 + Ref('b').symbol: ev_fv(Symbol('`test`') + 8),
+        Ref('a').symbol: ev_fv(5, Ref('a')),
+        Ref('bank').symbol - Ref('cost').symbol: ev_fv(red + 5 * black - 3 * uncolored),
+        Ref('state one').symbol - 5: ev_fv(N(-13.0), Symbol('`test`') - 5),
+        Ref('a').symbol + 1: ev_fv(6),
     }
 
-    for input, expected in expectations.items():
-        actual = eval_expr_with_context(input, context)
-        assert actual == expected, input
+    context = EngineContext.from_dict(context)
+
+    for entry, expected in expectations.items():
+        actual = entity_value_from_expression(entry, context)
+        assert actual == expected, entry
 
 
 def test_query_expression_chain_evaluation():
 
+    red, black, uncolored, a = symbols('red black uncolored a')
     context = {
-        Reference('test', None): 7,
-        Reference('test two', None): 196,
-        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): EntityValue(fs(1)),
+        Reference('test'): 7,
+        Reference('test two'): 196,
+        Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black')),
+        Reference('Hurt'): ev_fv(1),
         Reference('Turn Ended'): EntityValue( fs(1)),
-        Reference('Turn Started'): EntityValue(fs()),
+        Reference('Turn Started'): ev_fv(),
+        Reference('red', fs('symbol')): ev_fv(),
+        Reference('a', fs('symbol')): ev_fv(),
+        Reference('black', fs('symbol')): ev_fv(),
     }
 
     expectations = {
-        'Hurt & <Turn Started>': fs(),
-        'Hurt & <Turn Ended>': fs(context[Ref('Hurt')], context[Ref('Turn Ended')]),
-        '5--16': fs(21),
-        '5**2--16': fs(41),
-        '5**2.1--16': fs(45.365473577200476),
-        'bank & (bank - (5*black))': fs(context[Ref('bank')], Ref('red') * 3),
-        'bank ^ (test -7)': fs(context[Ref('bank')]),
-        'bank - (3 * red + 5 * black)': fs(),
-        'test -7 ^ test two': fs(196.0),
-        '(a & test) ** 12': fs(13841287201, Ref('a').as_symbol() ** 12),
-        'test ** 12': fs(13841287201),
-        '4+3*8^2/32+4^3/4-7': fs(-6.25),
-        '4+3*8**2/32+4**3/4-7': fs(19.0),
-        '!(test -7) ^ test two': fs(),
+        'bank - (3 * red + 5 * black)': ev_fv(),
+        '(a & test) ** 12': ev_fv(13841287201, a ** 12),
+        '4+3*8**2/32+4**3/4-7': ev_fv(19.0),
+        'bank & (bank - (5*black))': ev_fv(Ref('bank')) | ev_fv(3*red+5*black) | red * 3,
+        'Hurt & <Turn Started>': ev_fv(),
+        'Hurt & <Turn Ended>': ev_fv(1, Ref('Hurt'), Ref('Turn Ended')),
+        '5--16': ev_fv(21),
+        '5**2--16': ev_fv(41),
+        '5**2.1--16': ev_fv(45.365473577200476),
+        'bank ^ (test -7)': ev_fv(Ref('bank')) | ev_fv(3*red+5*black),
+        'test -7 ^ test two': ev_fv(196.0, Ref('test two')),
+        'test ** 12': ev_fv(13841287201),
+        '4+3*8^2/32+4^3/4-7': ev_fv(-6.25),
+        '!(test -7) ^ test two': ev_fv(),
 
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(QueryExpression, input)
+    context = EngineContext.from_dict(context)
+
+    for entry, expected in expectations.items():
+        expr = quick_parse(QueryExpression, entry)
         symbolized = symbolize_expression(expr)
         actual = evaluate_symbolized_postfix_stack(symbolized, context)
-        assert actual == expected, input
+        assert actual == expected, entry
 
 
 def test_query_expression_interpreter_complex():
-    context = {
+    black, red, uncolored = symbols('black red uncolored')
+
+    context_data = {
         Reference('test', None): 7,
         Reference('test two', None): 196,
-        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): EntityValue(fs(1)),
-        Reference('Turn Ended'): EntityValue(fs(1)),
-        Reference('Turn Started'): EntityValue(fs()),
-        Reference('void'): EntityValue(fs(1)),
+        Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black')),
+        Reference('Hurt'): ev_fv(1),
+        Reference('Turn Ended'): ev_fv(1),
+        Reference('Turn Started'): ev_fv(),
+        Reference('void'): ev_fv(1),
+        Reference('red', fs('symbol')): ev_fv(),
+        Reference('black', fs('symbol')): ev_fv(),
     }
+
+    context = EngineContext.from_dict(context_data)
 
     expectations = {
-        '*': QueryResult(
-            fs(EntityValue(fs(1))),
-        ),
         'bank & (bank - (5*black))': QueryResult(
-            fs(context[Ref('bank')], Ref('red') * 3)
-        )
+            ev_fv(Ref('bank'), red * 3) | context[Ref('bank')],
+        ),
+        '*': QueryResult(
+            ev_fv(Ref('*')),
+        ),
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(QueryExpression, input)
+    for entry, expected in expectations.items():
+        expr = quick_parse(QueryExpression, entry)
         symbolized = symbolize_expression(expr)
         actual = create_expression_interpreter(expr)
         assert actual.symbolized == symbolized
@@ -155,51 +176,54 @@ def test_query_expression_interpreter_complex():
 
 
 def test_assignment_expression_interpreter():
-    context = {
-        Reference('test'): 7,
-        Reference('test two'): 196,
-        Reference('test three'): fs(5),
-        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): EntityValue(fs(1)),
-        Reference('Turn Ended'): EntityValue(fs(1)),
-        Reference('Turn Started'): EntityValue(fs()),
-        Reference('noise'): EntityValue(fs()),
+    context_data = {
+        Reference('test'): ev_fv(7),
+        Reference('test two'): ev_fv(196),
+        Reference('test three'): ev_fv(5),
+        Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black')),
+        Reference('Hurt'): ev_fv(1),
+        Reference('Turn Ended'): ev_fv(1),
+        Reference('Turn Started'): ev_fv(),
+        Reference('noise'): ev_fv(),
+        Reference('red', fs('symbol')): ev_fv(),
+        Reference('black', fs('symbol')): ev_fv(),
     }
+
+    context = EngineContext.from_dict(context_data)
 
     expectations = {
+        'bank = (bank - (5*black))': {
+            Reference('bank'): ev_fv(3 * Ref('red')),
+        },
         'noise = `safe`': {
-            Reference('noise'): EntityValue(fs('safe')),
+            Reference('noise'): ev_fv(Symbol('`safe`')),
+            Reference('noise.*'): ev_fv(),
         },
         'test three *= 7': {
-            Reference('test three'): fs(35)
+            Reference('test three'): ev_fv(35),
         },
         'bank -= bank': {
-            Reference('bank'): EntityValue(fs())
+            Reference('bank'): ev_fv(),
+            Reference('bank.*'): ev_fv(1)
         },
         'test two /= 8.0': {
-            Reference('test two'): fs(N(24.5))
-        },
-        'bank = (bank - (5*black))': {
-            Reference('bank'): EntityValue(fs(3 * Ref('red')))
+            Reference('test two'): ev_fv(N(24.5)),
         },
         'bank += 1': {
-            Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black') + 1))
+            Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black') + 1),
         },
         'test *= 7': {
-            Reference('test'): fs(49)
+            Reference('test'): ev_fv(49),
         },
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(AssignmentExpression, input)
+    for entry, expected in expectations.items():
+        expr = quick_parse(AssignmentExpression, entry)
 
         interpreter = create_expression_interpreter(expr)
         actual = interpreter.interpret(context)
 
-        change_dict = {ChangeLedgerRef: expected}
-        expected_context = context | expected | change_dict
-
-        assert actual == AssignmentResult(expected_context)
+        assert actual.change == expected, entry
 
 
 def test_scenario_expression_interpreter():
@@ -207,20 +231,64 @@ def test_scenario_expression_interpreter():
         Reference('test'): 7,
         Reference('test two'): 196,
         Reference('test three'): fs(5),
-        Reference('bank'): EntityValue(fs(3 * Ref('red') + 5 * Ref('black'))),
-        Reference('Hurt'): EntityValue(fs(1)),
-        Reference('Turn Ended'): EntityValue(fs(1)),
-        Reference('Turn Started'): EntityValue(fs()),
+        Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black')),
+        Reference('Hurt'): ev_fv(1),
+        Reference('Turn Ended'): ev_fv(1),
+        Reference('Turn Started'): ev_fv(),
     }
 
     expectations = {
-        '%{3}': ScenarioResult(fs(3)),
-        '%{bank - bank}': ScenarioResult(fs()),
+        '%{3}': ScenarioResult(ev_fv(3)),
+        '%{bank - bank}': ScenarioResult(ev_fv()),
     }
 
-    for input, expected in expectations.items():
-        expr = quick_parse(ScenarioExpression, input)
+    for entry, expected in expectations.items():
+        expr = quick_parse(ScenarioExpression, entry)
 
         interpreter = create_expression_interpreter(expr)
         actual = interpreter.interpret(context)
         assert actual == expected
+
+
+def test_expression_simplification_detector():
+    black = symbols('black')
+    white = symbols('white')
+    context_data = {
+        Ref('black', fs('symbol')): ev_fv(),
+        Ref('white', fs('symbol')): ev_fv(),
+        Ref('a'): ev_fv(1),
+    }
+
+    context = EngineContext.from_dict(context_data)
+
+    expectations = {
+        black + white * 3: True,
+        Ref('a').symbol + black: False,
+    }
+
+    for expr, expected in expectations.items():
+        assert expected == expression_is_simplified(expr, context)
+
+
+def test_ev_simplification_detector():
+    black = symbols('black')
+    white = symbols('white')
+    context_data = {
+        Ref('black', fs('symbol')): ev_fv(),
+        Ref('white', fs('symbol')): ev_fv(),
+        Ref('a'): ev_fv(1),
+
+    }
+
+    context = EngineContext.from_dict(context_data)
+
+    expectations = {
+        ev_fv(black + white * 3, 1, Ref('a')): True,
+        ev_fv(Ref('a').symbol + black): False,
+        ev_fv(Ref('a').symbol + black, black + white * 3, 1): False,
+        ev_fv(black, black + white * 3, 1): True,
+        ev_fv(black, black + white * 3, 1, Ref('b').symbol): False,
+    }
+
+    for expr, expected in expectations.items():
+        assert expected == ev_is_simplified(expr, context)

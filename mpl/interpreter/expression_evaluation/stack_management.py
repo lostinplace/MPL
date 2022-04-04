@@ -1,10 +1,10 @@
-import itertools
 from ast import literal_eval
 from numbers import Number
 from operator import itemgetter
-from typing import Dict, List, Union, FrozenSet
+from typing import Dict, List
 
-from sympy import Expr
+from sympy import Expr, Symbol
+from sympy.core.relational import Relational
 
 from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
@@ -18,7 +18,7 @@ from mpl.interpreter.expression_evaluation.operators import OperatorOperation, O
     query_operations_dict
 from mpl.interpreter.expression_evaluation.types import symbolized_postfix_stack
 from mpl.interpreter.expression_evaluation.types import postfix_stack
-from mpl.lib.query_logic import eval_expr_with_context
+from mpl.lib.query_logic.expression_processing import entity_value_from_expression, simplify_entity_value
 
 
 def get_postfix_operand(operand: Expression, operation_dict: Dict[str, OperatorOperation]):
@@ -28,11 +28,11 @@ def get_postfix_operand(operand: Expression, operation_dict: Dict[str, OperatorO
         case QueryExpression() as x:
             return postfix(x, operation_dict)
         case TextExpression() as x:
-            return x.operands[0].content
+            return Symbol(f'`{x.operands[0].content}`')
         case NumberToken() as x:
             return literal_eval(x.content)
         case StringToken() as x:
-            return x.content
+            return Symbol(f'`{x.content}`')
         case ReferenceExpression() as x:
             return x.reference.without_types
         case TriggerExpression() as x:
@@ -70,14 +70,14 @@ def postfix(
     return out
 
 
-def symbolize_postfix(postfix_stack: postfix_stack) -> symbolized_postfix_stack:
+def symbolize_postfix(postfix_order_stack: postfix_stack) -> symbolized_postfix_stack:
     index = 0
     out_stack = []
-    while index < len(postfix_stack):
-        this_item = postfix_stack[index]
+    while index < len(postfix_order_stack):
+        this_item = postfix_order_stack[index]
         match this_item:
             case Reference():
-                out_stack.append(this_item.as_symbol())
+                out_stack.append(this_item.symbol)
             case OperatorOperation() if this_item.operation_type == OperationType.NumericAlgebra:
                 args = out_stack[-2:]
                 if all(isinstance(x, (Expr, Number)) for x in args):
@@ -103,8 +103,7 @@ def symbolize_expression(
 #TODO: test this to ensure it works
 def evaluate_symbolized_postfix_stack(
         postfix_queue: symbolized_postfix_stack,
-        context: 'ContextTree',
-        target=False
+        context: 'EngineContext',
 ) -> EntityValue:
 
     index: int = 0
@@ -116,9 +115,9 @@ def evaluate_symbolized_postfix_stack(
             case Number() | str():
                 result[index] = EntityValue.from_value(item)
                 index += 1
-            case Expr():
-                in_entity, out_entity = eval_expr_with_context(item, context)
-                result[index] = in_entity if not target else out_entity
+            case Expr() | Relational():
+                tmp = entity_value_from_expression(item, context)
+                result[index] = tmp
                 index += 1
             case OperatorOperation() if item.operation_type == OperationType.Unary:
                 tmp = item.method(result[index - 1])
@@ -133,5 +132,6 @@ def evaluate_symbolized_postfix_stack(
     assert len(result) == 1
     out = result[0]
     assert isinstance(out, EntityValue)
-
-    return out.clean
+    out = out.clean
+    out = simplify_entity_value(out, context)
+    return out

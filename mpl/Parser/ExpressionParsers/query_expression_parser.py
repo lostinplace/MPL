@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from typing import Union, Tuple, FrozenSet
 
-from parsita import TextParsers, fwd, longest, lit, Success
+from parsita import TextParsers, fwd, longest, Success
 
 from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
-    ReferenceExpressionParsers as RefExP, Reference
+    ReferenceExpressionParsers as RefExP
 from mpl.Parser.ExpressionParsers.text_expression_parser import TextExpressionParsers as TexExP, TextExpression
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpressionParsers as ArExP, \
     ArithmeticExpression

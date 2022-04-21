@@ -8,7 +8,7 @@ from sympy import Symbol
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, ReferenceExpression
 
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, false_value, ev_fv, true_value
 
 
 @dataclasses.dataclass(order=True)
@@ -16,14 +16,13 @@ class ContextTreeNode:
     ref: Reference = Reference('ROOT')
     value: EntityValue = EntityValue()
     children: Dict[str, 'ContextTreeNode'] = dataclasses.field(default_factory=dict)
-    parent: Optional['ContextTreeNode'] = None
 
     def __getitem__(self, item: Reference) -> EntityValue:
         return get_value(self, item)
 
     @property
     def void_value(self) -> EntityValue:
-        return EntityValue.from_value(1) if not self.entity else EntityValue()
+        return EntityValue.from_value(True) if not self.entity else EntityValue()
 
     @property
     def entity(self) -> EntityValue:
@@ -49,6 +48,22 @@ class ContextTreeNode:
         for node in self.children.values():
             yield from node.__iter__()
 
+    def __eq__(self, other):
+        if self.ref != other.ref:
+            return False
+        if self.value != other.value:
+            return False
+        if self.entity != other.entity:
+            return False
+        self_items = set(self.children.items())
+        other_items = set(other.children.items())
+        if self_items != other_items:
+            return False
+        return True
+
+    def __hash__(self):
+        return hash((self.ref, self.value, self.entity, tuple(self.children.items())))
+
 
 @dataclasses.dataclass(order=True)
 class ContextTree:
@@ -62,7 +77,9 @@ class ContextTree:
     def clear(self, ref: Reference | FrozenSet[Reference]) -> Dict[Reference, EntityValue]:
         return clear_references(self.root, ref)
 
-    def change(self, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
+    def change(self, ref: Reference | str, value: EntityValue) -> Dict[Reference, EntityValue]:
+        if isinstance(ref, str):
+            ref = Reference(ref)
         return change_node(self.root, ref, value)
 
     def update(self, other: Dict[Reference, EntityValue]) -> Dict[Reference, EntityValue]:
@@ -83,8 +100,14 @@ class ContextTree:
 
     #endregion
 
+    def __hash__(self):
+        return hash(self.root)
+
     def __contains__(self, item: Reference):
-        return item in self.__keys__()
+        for ref in self.__keys__():
+            if refs_are_compatible(ref, item):
+                return True
+        return False
 
     def __keys__(self) -> FrozenSet[Reference]:
         if self._keys is None:
@@ -119,6 +142,9 @@ class ContextTree:
     def __str__(self):
         return f'ContextTree({self.to_string()})'
 
+    def __eq__(self, other):
+        return self.root == other.root
+
 
 class OperationResult(Enum):
     SUCCESS = 0
@@ -126,20 +152,24 @@ class OperationResult(Enum):
 
 
 def reference_is_child_of_reference(ref: Reference, potential_parent_ref: Reference) -> int:
-    ref_expr = ref.expression
-    ref_expr_length = len(ref_expr.path)
-    if potential_parent_ref == Reference('ROOT'):
-        return ref_expr_length
-    parent_expr = potential_parent_ref.expression
-    parent_expr_length = len(parent_expr.path)
+    ref_expr_path = ref.expression.path
+    if not ref_expr_path[0] == 'ROOT':
+        ref_expr_path = ('ROOT',) + ref_expr_path
 
-    if parent_expr.path != ref_expr.path[:parent_expr_length]:
+    parent_expr_path = potential_parent_ref.expression.path
+    if not parent_expr_path[0] == 'ROOT':
+        parent_expr_path = ('ROOT',) + parent_expr_path
+    parent_path_length = len(parent_expr_path)
+
+    ref_expr_length = len(ref_expr_path)
+
+    if parent_expr_path != ref_expr_path[:parent_path_length]:
         return -1
 
-    if ref_expr.path == parent_expr.path:
+    if ref_expr_length == parent_expr_path:
         return 0
 
-    return ref_expr_length - parent_expr_length
+    return ref_expr_length - parent_path_length
 
 
 def get_intermediate_child_ref(parent: Reference, ref: Reference, stages: int) -> Reference:
@@ -166,9 +196,13 @@ def add_child(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Oper
         case 0:
             node.ref = dataclasses.replace(node.ref, types=ref.types | node.ref.types)
             return OperationResult.SUCCESS
-        case 1:
-            new_node = ContextTreeNode(ref, value, parent=node)
+        case 1 if ref.name not in node.children:
+            new_node = ContextTreeNode(ref, value)
             node.children[ref.name] = new_node
+            return OperationResult.SUCCESS
+        case 1 if ref.name in node.children:
+            existing_node = node.children[ref.name]
+            change_node(existing_node, ref, value)
             return OperationResult.SUCCESS
         case x if x > 1:
             intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
@@ -201,8 +235,8 @@ def get_node_by_ref(node: ContextTreeNode, ref: Reference) -> Optional[ContextTr
     if degree == -1:
         return None
     if degree == 1 and ref.is_void:
-        value = EntityValue.from_value(1) if not node.entity else EntityValue()
-        return ContextTreeNode(ref, value, parent=node)
+        value = false_value if node.entity else EntityValue.from_value(True)
+        return ContextTreeNode(ref, value)
     intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
     intermediate_child = node.children.get(intermediate_child_ref.name)
     if intermediate_child is None:
@@ -223,9 +257,6 @@ def tree_to_dict(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
     result = {
         node.ref: node.entity
     }
-    tmp = get_value(node, node.ref.void)
-    if tmp:
-        result[node.ref.void] = tmp
 
     for child in node.children.values():
         result |= tree_to_dict(child)
@@ -233,49 +264,70 @@ def tree_to_dict(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
     return result
 
 
+def get_children_entity(node: ContextTreeNode) -> EntityValue:
+    result = EntityValue()
+    for _, v in node.children.items():
+        result |= v.entity
+    return result
+
+
+def void_node(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
+    result = {}
+    original_entity = node.entity
+    for _, v in node.children.items():
+        result |= void_node(v)
+    node.value = false_value
+    if node.entity != original_entity:
+        result[node.ref] = node.entity
+    if original_entity:
+        result[node.ref.void] = true_value
+    return result
+
+
+def change_child_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
+    result = {}
+    intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
+    intermediate_child = node.children.get(intermediate_child_ref.name)
+    original_value = node.entity
+    if intermediate_child is None:
+        intermediate_child = ContextTreeNode(intermediate_child_ref)
+        node.children[intermediate_child_ref.name] = intermediate_child
+    result |= change_node(intermediate_child, ref, value)
+    child_value = get_children_entity(node)
+    node.value = node.value.without(child_value)
+    if node.entity != original_value:
+        result |= {node.ref: node.entity}
+
+    return result
+
+
 def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
     value = EntityValue.from_value(value)
-    target_this_node = refs_are_compatible(ref, node.ref)
-
-    if target_this_node and value:
-        from_children = node.entity.without(node.value)
-        not_handled_by_children = value.without(from_children)
-        old_void = node.void_value
-        node.value = not_handled_by_children
-        output = {
-            node.ref: node.entity
-        }
-        new_void = node.void_value
-        if old_void != new_void:
-            output[node.ref.void] = new_void
-        return output
-    elif target_this_node and not value:
-        ref = node.ref.void
-        value = EntityValue.from_value(1)
-
+    changes = {}
     degree = reference_is_child_of_reference(ref, node.ref)
-    if degree == -1:
-        return {}
-    if degree == 1 and ref.is_void and value:
-        node.value = EntityValue()
-        changes = {
-            ref: EntityValue.from_value(1),
-            node.ref: EntityValue()
-        }
-        for child_ref_name, child_node in node.children.items():
-            child_ref = Reference(child_ref_name)
-            changes |= change_node(child_node, child_ref, EntityValue())
-        return changes
-    elif degree > 0:
-        intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
-        intermediate_child = node.children.get(intermediate_child_ref.name)
-        original_value = node.entity
-        if intermediate_child is None:
-            return {}
-        changes = change_node(intermediate_child, ref, value)
-        if node.entity != original_value:
-            changes |= {node.ref: node.entity}
-        return changes
+    match degree:
+        case -1:
+            pass
+        case 0 if refs_are_compatible(ref, node.ref):
+            from_children = get_children_entity(node)
+            not_handled_by_children = value.without(from_children)
+            old_void = node.void_value
+            old_entity = node.entity
+            node.value = not_handled_by_children
+            new_void = node.void_value
+            new_entity = node.entity
+            if hash(old_entity) != hash(new_entity):
+                changes[node.ref] = new_entity
+            if old_void != new_void:
+                changes[node.ref.void] = new_void
+        case 1 if ref.is_void and value:
+            changes |= void_node(node)
+        case 1 if ref.is_void:
+            pass
+        case _:
+            changes |= change_child_node(node, ref, value)
+
+    return changes
 
 
 def clear_references(node: ContextTreeNode, references: FrozenSet[Reference]) -> Dict[Reference, EntityValue]:
@@ -288,13 +340,13 @@ def clear_references(node: ContextTreeNode, references: FrozenSet[Reference]) ->
     return changes
 
 
-def copy_tree(node: ContextTreeNode | ContextTree, parent: Optional[ContextTreeNode] = None) -> ContextTreeNode:
+def copy_tree(node: ContextTreeNode | ContextTree) -> ContextTreeNode:
     if isinstance(node, ContextTree):
-        return copy_tree(node.root, None)
-    result = ContextTreeNode(node.ref, parent=parent)
+        return copy_tree(node.root)
+    result = ContextTreeNode(node.ref)
     result.value = node.value
     result.children = {
-        child_name: copy_tree(child, node)
+        child_name: copy_tree(child)
         for child_name, child in node.children.items()
     }
     return result

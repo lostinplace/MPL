@@ -1,12 +1,12 @@
 import dataclasses
-from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
+from typing import FrozenSet, Dict, Union, Set, Tuple, Optional, Iterator
 
 from networkx import MultiDiGraph
 from sympy import Symbol
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.lib.context_tree.context_tree_implementation import ContextTree
+from mpl.lib.context_tree.context_tree_implementation import ContextTree, get_node_by_ref
 
 ref_name = Union[str, Ref]
 
@@ -25,10 +25,20 @@ class EngineContext:
     """
     EngineContext are immutable, any time you omake a change, you receive a new context along with the change manifest
     """
-    tree: ContextTree = ContextTree()
+    tree: ContextTree = dataclasses.field(default_factory=ContextTree)
 
     def __getitem__(self, item: Reference) -> 'EntityValue':
         return self.tree[item]
+
+    def __iter__(self) -> Iterator[Reference]:
+        keys = set()
+        for ref in self.tree:
+            if not ref[0].is_void:
+                keys.add(ref[0])
+        return keys.__iter__()
+
+    def __contains__(self, item: Reference) -> bool:
+        return item in self.tree
 
     # region Modifiers
     # these methods return a new context with the changes applied
@@ -65,7 +75,7 @@ class EngineContext:
 
     def activate(self, ref: ref_name | Set[ref_name], value=None) -> Tuple['EngineContext', context_diff]:
         if value is None:
-            value = EntityValue.from_value(value or 1)
+            value = EntityValue.from_value(value or True)
 
         target_tree = self.tree.__copy__()
         changes = {}
@@ -96,7 +106,10 @@ class EngineContext:
 
     @property
     def active(self) -> Dict[Reference, EntityValue]:
-        return {ref: value for ref, value in self.tree if value and not ref.is_void}
+        return {
+            ref: value for ref, value in self.tree
+            if value and not ref.is_void
+        }
 
     @property
     def ref_names(self) -> FrozenSet[str]:
@@ -154,9 +167,15 @@ class EngineContext:
         return EngineContext.diff(self, other)
 
     def __str__(self):
-        items = [(x[0].name, x[1]) for x in self.active.items()]
+        items = {}
+
+        for ref in self.active:
+            tmp = get_node_by_ref(self.tree.root, ref)
+            if tmp.value:
+                items[ref.name] = tmp.value
+
         lines = []
-        for key, value in items:
+        for key, value in items.items():
             value_component = ','.join(str(x) for x in value)
             lines.append(f'{key}: {{{value_component}}}')
         sorted_lines = sorted(lines)
@@ -167,3 +186,9 @@ class EngineContext:
 
     def __hash__(self):
         return hash(self.tree)
+
+    def __eq__(self, other):
+        return self.tree == other.tree
+
+    def __keys__(self):
+        return self.tree.__keys__()

@@ -8,6 +8,7 @@ from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
+from mpl.interpreter.expression_evaluation.entity_value import ev_fv
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.lib import fs
 from mpl.runtime.cli.command_parser import SystemCommand, QueryCommand, ExploreCommand, ActivateCommand, TickCommand, \
@@ -26,7 +27,7 @@ def test_command_parsing():
         '?': QueryCommand(),
         'explore 13': ExploreCommand(13),
         'explore': ExploreCommand(1),
-        '+a': ActivateCommand(quick_parse(AssignmentExpression, f"a={Ref('a').id}")),
+        '+a': ActivateCommand(quick_parse(AssignmentExpression, f"a=True")),
         '.': TickCommand(1),
         '.1': TickCommand(1),
         '.2': TickCommand(2),
@@ -36,7 +37,7 @@ def test_command_parsing():
     for text, expected_value in expectations.items():
         actual = CommandParsers.command.parse(text)
         expected = Success(expected_value)
-        assert actual == expected
+        assert actual == expected, text
 
 
 def test_command_execution():
@@ -45,8 +46,11 @@ def test_command_execution():
     ]
 
     expectations = {
+        '+test': {
+            Ref('test'): (ev_fv(), ev_fv(True)),
+            Ref('test.*'): (ev_fv(True), ev_fv()),
+        },
         'add A->B->C': f'Incorporated Rule: {quick_parse(RuleExpression, "A->B->C")}',
-        '+test': {'test': (fs(), fs(Ref('test').id))},
     }
 
     for command, expected_structure in expectations.items():
@@ -55,7 +59,7 @@ def test_command_execution():
         result = execute_command(engine, command)
         actual = result
         expected = expected_structure
-        assert actual == expected
+        assert actual == expected, command
 
 
 def test_command_sequences():
@@ -65,32 +69,44 @@ def test_command_sequences():
 
     expectations = [
         {
-            'load Tests/test_files/simplest.mpl': None
+            'load Tests/test_files/simplest.mpl': None,
+            '+Three': {
+                Ref('Three'): (ev_fv(), ev_fv(True)),
+                Ref('Three.*'): (ev_fv(True), ev_fv()),
+            },
+            'clear context': None,
+            '?': {}
         },
         {
             'add state one->state two': f'Incorporated Rule: {quick_parse(RuleExpression, "state one->state two")}',
-            '+state one': {'state one': (fs(), fs(Ref('state one').id))},
+            '+state one': {
+                Ref('state one'): (ev_fv(), ev_fv(True)),
+                Ref('state one.*'): (ev_fv(True), ev_fv()),
+            },
             '.': {
-                'state one': (fs(Ref('state one').id), fs()),
-                'state two': (fs(), fs(Ref('state one').id)),
+                Ref('state one'): (ev_fv(True), ev_fv()),
+                Ref('state one.*'): (ev_fv(), ev_fv(True)),
+                Ref('state two'): (ev_fv(), ev_fv(Ref('state one'), True)),
+                Ref('state two.*'): (ev_fv(True), ev_fv())
             },
             '.-1': {
-                'state one': (fs(), fs(Ref('state one').id)),
-                'state two': (fs(Ref('state one').id), fs()),
+                Ref('state one'): (ev_fv(), ev_fv(True)),
+                Ref('state one.*'): (ev_fv(True), ev_fv()),
+                Ref('state two'): (ev_fv(Ref('state one'), True), ev_fv()),
+                Ref('state two.*'): (ev_fv(), ev_fv(True))
             },
+        },
+        {
+            'load Tests/test_files/simplest.mpl': None
         },
         {
             'add A->B->C': f'Incorporated Rule: {quick_parse(RuleExpression, "A->B->C")}',
             '.': None,
-            '?A': {Ref('A'): fs()},
+            '?A': {
+                Ref('A'): ev_fv(),
+            },
             '+A': None,
         },
-        {
-            'load Tests/test_files/simplest.mpl': None,
-            '+Three': {'Three': (fs(), fs(Ref('Three').id))},
-            'clear context': None,
-            '?': {}
-        }
     ]
 
     for command_sequence in expectations:
@@ -98,4 +114,5 @@ def test_command_sequences():
         engine.add(expressions)
         for command, expected in command_sequence.items():
             result = execute_command(engine, command)
-            assert expected is None or result == expected
+            equality = result == expected
+            assert expected is None or equality, command

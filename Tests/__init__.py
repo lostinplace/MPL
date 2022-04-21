@@ -5,12 +5,12 @@ from parsita import Failure, Success
 
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression, ArithmeticExpressionParsers
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpressionParsers, AssignmentExpression
-from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers, \
+    VectorExpression, VectorExpressionParsers
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpressionParsers, RuleExpression
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers
 from mpl.Parser.ExpressionParsers.trigger_expression_parser import TriggerExpressionParsers, TriggerExpression
-from mpl.Parser.ExpressionParsers.vector_expression_parser import VectorExpression, VectorExpressionParsers
 from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers, StringToken
 
 

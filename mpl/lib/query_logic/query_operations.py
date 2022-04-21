@@ -4,7 +4,7 @@ from mpl.lib.query_logic import false_result, true_result
 
 def query_negate(operand: EntityValue) -> EntityValue:
     match operand:
-        case EntityValue() as x if x.value:
+        case EntityValue() as x if x:
             return false_result
         case EntityValue():
             return true_result

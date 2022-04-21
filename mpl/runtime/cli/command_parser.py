@@ -166,7 +166,7 @@ class ActivateCommand:
             case ReferenceExpression():
                 reference = expression.reference
                 value = reference.id
-                expr_input = f'{reference.name}={value}'
+                expr_input = f'{reference.name}={True}'
                 expr = AExpP.expression.parse(expr_input)
                 assert isinstance(expr, Success)
 

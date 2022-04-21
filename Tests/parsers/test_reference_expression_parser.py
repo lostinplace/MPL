@@ -1,16 +1,13 @@
 from parsita import Success
 
-from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression, \
-    Reference
-from Tests import collect_parsing_expectations
+from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpressionParsers, ReferenceExpression
 from mpl.lib import fs
 
 
 def test_reference_expression_parsers():
     expectations = {
         "a": ReferenceExpression(
-            ('a',),
-            None
+            ('a',)
         ),
         "a:test": ReferenceExpression(
             ('a',),

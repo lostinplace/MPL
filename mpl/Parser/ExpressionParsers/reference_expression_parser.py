@@ -13,9 +13,9 @@ import re
 import os
 from numbers import Number
 
-from sympy import Symbol, symbols, Expr
+from sympy import Symbol
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union, List, FrozenSet, Dict
+from typing import Optional, Tuple, Union, List, FrozenSet
 
 from parsita import TextParsers, opt, repsep, Success, lit, longest
 from parsita.util import splat
@@ -40,7 +40,7 @@ ref_symbol_pattern = re.compile(pattern)
 @dataclass(frozen=True, order=True)
 class Reference:
     name: str
-    types: Optional[FrozenSet[str]] = None
+    types: FrozenSet[str] = frozenset()
 
     @staticmethod
     def ROOT():
@@ -54,22 +54,23 @@ class Reference:
                 return self.types
             case tuple() | frozenset():
                 return ','.join(self.types)
-            case None:
-                return ''
-            case _:
-                return ''
+
+        return ''
 
     @property
     def is_void(self) -> bool:
-        return self.name[-2:] == '.*'
+        return self.name == '*' or self.name[-2:] == '.*'
 
     @property
     def parent(self) -> 'Reference':
-        return self.expression.parent.reference
+        tmp = self.to_reference_expression()
+        new_lineage = tmp.path[:-1]
+        parent_expr = ReferenceExpression(new_lineage, self.types)
+        return parent_expr.reference
 
     @property
     def void(self) -> 'Reference':
-        return dataclasses.replace(self, name=self.name + '.*', types=None)
+        return dataclasses.replace(self, name=self.name + '.*')
 
     @property
     def expression(self) -> 'ReferenceExpression':
@@ -98,7 +99,7 @@ class Reference:
 
     @property
     def without_types(self) -> 'Reference':
-        return dataclasses.replace(self, types=None)
+        return dataclasses.replace(self, types=frozenset())
 
     def is_child_of(self, other: 'Reference') -> bool:
         return self.name.startswith(other.name + '.')
@@ -156,7 +157,7 @@ Ref = Reference
 @dataclass(frozen=True, order=True)
 class ReferenceExpression:
     path: Tuple[str, ...]
-    types: Optional[FrozenSet[str]] = None
+    types: FrozenSet[str] = frozenset()
     parent: Optional['ReferenceExpression'] = None
 
     @property
@@ -179,7 +180,9 @@ class ReferenceExpression:
 
     @staticmethod
     def interpret(path: List[ReferenceToken], types: List[List[ReferenceToken]]) -> 'ReferenceExpression':
-        new_types = frozenset(type.content for type in types[0]) if types else None
+        if path == [ReferenceToken('True')] and not types:
+            return True
+        new_types = frozenset(type.content for type in types[0]) if types else frozenset()
         new_path = tuple(pathitem.content for pathitem in path)
         return ReferenceExpression(new_path, new_types)
 
@@ -187,7 +190,7 @@ class ReferenceExpression:
     def void(prefix) -> 'ReferenceExpression':
         if prefix:
             as_strings = tuple(x.content for x in prefix[0])
-            return ReferenceExpression(as_strings + ('*',), None)
+            return ReferenceExpression(as_strings + ('*',))
         return ReferenceExpression(('*',))
 
     def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
@@ -201,9 +204,6 @@ class ReferenceExpression:
     @property
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:
         return frozenset({self})
-
-
-
 
 
 class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
@@ -220,8 +220,8 @@ class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
 def test_reference_expression_parsing():
 
     expectations = {
-        'test me': Reference('test me', None),
-        'base.test me': Reference('base.test me', None),
+        'test me': Reference('test me'),
+        'base.test me': Reference('base.test me'),
         'base.test me:int': Reference('base.test me', fs('int')),
     }
 

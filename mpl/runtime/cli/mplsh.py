@@ -137,7 +137,7 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             result = engine.execute_interpreters({interpreter})
             return result
         case AddRuleCommand():
-            engine.add(value.expression)
+            engine = engine.add(value.expression)
             return f'Incorporated Rule: {value.expression}'
         case DropRuleCommand():
             engine.remove(value.expression)
@@ -157,9 +157,7 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             value.save(engine)
         case TickCommand():
             start_context = engine.context
-            engine.tick(value.number)
-            end_context = engine.context
-            result = start_context.get_diff(end_context)
+            result = engine.tick(value.number)
             return result
         case ExploreCommand() as explore_command:
             # TODO: explore command
@@ -190,11 +188,8 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             interpreter = RuleInterpreter.from_expression(re)
             rule_context = EngineContext.from_interpreter(interpreter)
             engine.context = rule_context | engine.context
-            result = interpreter.interpret(engine.context)
-            conflicts = identify_conflicts([result])
-            resolved = resolve_conflict_map(conflicts, 1)
-            result = engine.apply(resolved)
-            return result
+            results = engine.execute_interpreters(frozenset({interpreter}))
+            return results
         case _:
             return f'Unknown command: {value}'
 

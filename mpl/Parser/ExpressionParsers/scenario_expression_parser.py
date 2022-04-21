@@ -4,8 +4,8 @@ from typing import Tuple, FrozenSet
 from parsita import TextParsers
 
 from mpl.Parser.ExpressionParsers import Expression
-from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
-from mpl.Parser.ExpressionParsers.vector_expression_parser import VectorExpression, VectorExpressionParsers as VEP
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, VectorExpression, \
+    VectorExpressionParsers as VEP
 
 
 @dataclass(frozen=True, order=True)

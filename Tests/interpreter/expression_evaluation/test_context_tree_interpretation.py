@@ -7,7 +7,7 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref, Reference
 from mpl.interpreter.conflict_resolution import identify_conflicts, get_resolutions, normalize_tracker
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv, true_value
 from mpl.interpreter.expression_evaluation.interpreters.target_exprression_interpreter import target_operations_dict
 from mpl.interpreter.expression_evaluation.stack_management import symbolize_expression, \
     evaluate_symbolized_postfix_stack
@@ -71,8 +71,8 @@ def test_evaluating_target_expression_with_context_tree():
     }
 
     expectations = {
-        QueryExpression.parse("a.b.f ^ a.b.d-1"): ev_fv(Ref("a.b.f")),
         QueryExpression.parse("a.b.d & a.b"): ev_fv(Ref("a.b.d"), Ref("a.b"), 1, 2, symbols('`value`')),
+        QueryExpression.parse("a.b.f ^ a.b.d-1"): ev_fv(Ref("a.b.f")),
     }
 
     for expression, expected in expectations.items():
@@ -187,7 +187,6 @@ def test_tree_to_dict():
         Reference('a.b.d'): EntityValue.from_value({1}),
         Reference('a.b.e'): EntityValue.from_value({2}),
         Reference('a.b.f'): EntityValue.from_value(frozenset()),
-        Reference('a.b.f.*'): EntityValue.from_value({1}),
         Reference('test'): EntityValue.from_value(frozenset({3})),
         Reference('test.final'): EntityValue.from_value({3}),
         Reference('test.temporary'): EntityValue.from_value({3})
@@ -211,47 +210,37 @@ def test_change_node():
     }
 
     expectations = {
+        (Reference("a.b.*"), 17): {
+            Reference('ROOT'): EntityValue.from_value(frozenset({'test', 3})),
+            Reference('a'): EntityValue.from_value({'test'}),
+            Reference('a.b'): EntityValue(),
+            Reference('a.b.*'): ev_fv(True),
+            Reference('a.b.c'): ev_fv(),
+            Reference('a.b.c.*'): true_value,
+            Reference('a.b.d'): ev_fv(),
+            Reference('a.b.d.*'): true_value,
+            Reference('a.b.e'): ev_fv(),
+            Reference('a.b.e.*'): true_value,
+        },
         (Reference("a.b.d"), 13): {
             Reference('ROOT'): EntityValue.from_value(frozenset({13, 2, 'test', 3, 'value'})),
             Reference('a'): EntityValue.from_value({2, 13, 'test', 'value'}),
             Reference('a.b'): EntityValue.from_value(frozenset({13, 'value', 2})),
             Reference("a.b.d"): EntityValue.from_value(frozenset({13})),
         },
-        (Reference("a.b.*"), 17): {
-            Reference('ROOT'): EntityValue.from_value(frozenset({'test', 3})),
-            Reference('a'): EntityValue.from_value({'test'}),
-            Reference('a.b'): EntityValue(),
-            Reference('a.b.*'): EntityValue.from_value({1}),
-            Reference('a.b.c'): EntityValue(value=frozenset()),
-            Reference('a.b.c.*'): EntityValue(value=frozenset({1})),
-            Reference('a.b.d'): EntityValue(value=frozenset()),
-            Reference('a.b.d.*'): EntityValue(value=frozenset({1})),
-            Reference('a.b.e'): EntityValue(value=frozenset()),
-            Reference('a.b.e.*'): EntityValue(value=frozenset({1})),
-            Reference('a.b.f'): EntityValue(value=frozenset()),
-            Reference('a.b.f.*'): EntityValue(value=frozenset({1}))
-        },
-        (Reference("test"), frozenset()): {
-            Reference('ROOT'): EntityValue.from_value(frozenset({1, 2, 'test', 'value'})),
-            Reference("test.final"): EntityValue(),
-            Reference("test.*"): EntityValue.from_value({1}),
-            Reference("test.temporary"): EntityValue(),
-            Reference('test'): EntityValue(value=frozenset()),
-            Reference('test.*'): EntityValue(value=frozenset({1})),
-            Reference('test.final'): EntityValue(value=frozenset()),
-            Reference('test.final.*'): EntityValue(value=frozenset({1})),
-            Reference('test.temporary'): EntityValue(value=frozenset()),
-            Reference('test.temporary.*'): EntityValue(value=frozenset({1}))
-        },
+        (Reference("test"), frozenset()): {},
     }
 
     for (ref, change), expected_change in expectations.items():
+        label = f"{ref} -> {change}"
         tree = tree_from_dict(input_dict)
         original_dict = tree_to_dict(tree)
         expected_dict = original_dict | expected_change
-        new_value = EntityValue.from_value(change)
+        expected_dict = {k: v for k, v in expected_dict.items() if not k.is_void}
+
+        new_value = ev_fv(change)
         changes = change_node(tree, ref, new_value)
-        assert changes == expected_change, f"{ref} -> {change}"
+        assert changes == expected_change, label
         actual_dict = tree_to_dict(tree)
         assert actual_dict == expected_dict
 

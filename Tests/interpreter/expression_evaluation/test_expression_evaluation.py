@@ -84,10 +84,10 @@ def test_eval_expr():
     }
 
     expectations = {
+        Ref('state one').symbol - 5: ev_fv(N(-13.0), Symbol('`test`') - 5),
         Ref('a').symbol + 3 + Ref('b').symbol: ev_fv(Symbol('`test`') + 8),
         Ref('a').symbol: ev_fv(5, Ref('a')),
         Ref('bank').symbol - Ref('cost').symbol: ev_fv(red + 5 * black - 3 * uncolored),
-        Ref('state one').symbol - 5: ev_fv(N(-13.0), Symbol('`test`') - 5),
         Ref('a').symbol + 1: ev_fv(6),
     }
 
@@ -144,8 +144,8 @@ def test_query_expression_interpreter_complex():
     black, red, uncolored = symbols('black red uncolored')
 
     context_data = {
-        Reference('test', None): 7,
-        Reference('test two', None): 196,
+        Reference('test'): 7,
+        Reference('test two'): 196,
         Reference('bank'): ev_fv(3 * Ref('red') + 5 * Ref('black')),
         Reference('Hurt'): ev_fv(1),
         Reference('Turn Ended'): ev_fv(1),

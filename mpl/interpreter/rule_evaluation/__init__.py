@@ -34,7 +34,7 @@ class RuleInterpretationState(Enum):
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleInterpretation:
     state: RuleInterpretationState
-    changes: Dict[Reference | str, EntityValue]
+    changes: Dict[Reference | str, Tuple[EntityValue, EntityValue]]
     source: str = ''
     scenarios: FrozenSet[ScenarioResult] = frozenset()
 
@@ -58,14 +58,16 @@ class RuleInterpretation:
         return hash((self.state, tuple(self.changes.items()), self.scenarios))
 
     def __repr__(self):
-        return f'Interpretation({self.source})'
+        tmp = [f'{k}:{v0}->{v1}' for k, (v0, v1) in sorted(self.changes.items(), key=lambda x: x[0])]
+        changes_formatted = ', '.join(tmp)
+        return f'Interpretation({self.source}, changes={changes_formatted})'
 
 
 def compress_result_cache(result_cache: List[EntityValue]) -> EntityValue:
     result = EntityValue()
     for value in result_cache:
         result |= value
-    return result
+    return result.clean
 
 
 def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterpreter], expression: RuleExpression) \
@@ -98,14 +100,14 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
                 all_changes |= changes
                 result_cache.append(result.value)
             case QueryResult(), MPLOperator(_, 'OBSERVE', __, _):
-                result_cache.append(EntityValue.from_value(1))
+                result_cache.append(EntityValue.from_value(True))
             case AssignmentResult() as x, None:
                 result_context, changes = result_context.update(x.change)
                 all_changes |= changes
             case AssignmentResult() as x, MPLOperator(_, 'OBSERVE', __, _):
                 result_context, changes = result_context.update(x.change)
                 all_changes |= changes
-                result_cache.append(EntityValue.from_value(1))
+                result_cache.append(EntityValue.from_value(True))
             case AssignmentResult() as x, MPLOperator(_, 'CONSUME', __, _):
                 result_context, changes = result_context.update(x.change)
                 all_changes |= changes
@@ -120,7 +122,7 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
                 result_cache.append(x.value)
             case ScenarioResult() as x, MPLOperator(_, 'OBSERVE', __, _):
                 scenarios |= x.value
-                result_cache.append(EntityValue.from_value(1))
+                result_cache.append(EntityValue.from_value(True))
             case TargetResult() as x, None:
                 target_refs = x.value.references
                 target_value = compress_result_cache(result_cache)

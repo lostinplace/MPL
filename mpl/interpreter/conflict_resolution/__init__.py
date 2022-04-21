@@ -101,7 +101,7 @@ def choose_outcome(
 
     candidates = [target] + rc_list
     weights = [target.scenario_weight] + rc_weights
-    random.seed(seed)
+    # random.seed(seed)
     choice = random.choices(candidates, weights=weights, k=1)[0]
 
     new_acceptance = existing_choices.Accepted | {choice}

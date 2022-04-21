@@ -9,7 +9,7 @@ from parsita.util import splat
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
     ReferenceExpressionParsers as RefExP
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers as RuleExP
-from mpl.Parser.ExpressionParsers.vector_expression_parser import VectorExpressionParsers, VectorExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import VectorExpression, VectorExpressionParsers
 
 from mpl.lib.parsers.additive_parsers import track, TrackedValue
 from mpl.lib.parsers.custom_parsers import check
@@ -66,7 +66,7 @@ class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):
     empty_line = iw << check('\n') > BlankLine.interpret
     valid_line = longest(empty_line, declaration_line, rule_line)
     rule_lines = repsep2(valid_line, '\n', reset=True, min=1)
-    context_line = RefExP.expression << ':' & VectorExpressionParsers.vector_as_frozen_set
+    context_line = RefExP.expression << ':' & VectorExpressionParsers.expression_as_frozen_set
     context_lines = repsep2(context_line, '\n', reset=True, min=1)
     divider = lit('---\n')
     machine_file = rule_lines & opt(divider >> context_lines) << opt(rep(empty_line)) > splat(MachineFile.interpret)

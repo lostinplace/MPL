@@ -108,8 +108,6 @@ def construct_graph_from_expressions(expressions: FrozenSet[RuleExpression | Ref
                     edges.add((rulex, Relationship.USES, this_ref.without_types))
                     for type in this_ref.types or ():
                         edges.add((this_ref.without_types, Relationship.IS_A, type))
-        test = [x for x in edges if isinstance(x[0], Reference) and '*' in str(x[0])]
-        pass
 
     graph = MultiDiGraph()
     for edge in edges:

@@ -12,7 +12,7 @@ from mpl.interpreter.expression_evaluation.entity_value import ev_fv
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
 from mpl.lib import fs
 from mpl.runtime.cli.command_parser import SystemCommand, QueryCommand, ExploreCommand, ActivateCommand, TickCommand, \
-    CommandParsers, LoadCommand
+    CommandParsers, LoadCommand, MemoryType, SaveCommand
 from mpl.runtime.cli.mplsh import execute_command
 
 
@@ -116,3 +116,47 @@ def test_command_sequences():
             result = execute_command(engine, command)
             equality = result == expected
             assert expected is None or equality, command
+
+
+def test_basic_command_parsing():
+    expectations = {
+        'load /foo/bar': LoadCommand('/foo/bar'),
+        'load context from /foo/bar': LoadCommand('/foo/bar', MemoryType.CONTEXT),
+        'load rules from foo/bar': LoadCommand('foo/bar', MemoryType.RULES),
+        'save scratch.mpl': SaveCommand('scratch.mpl', MemoryType.ALL),
+    }
+
+    for input, expected in expectations.items():
+        assert CommandParsers.command.parse(input) == Success(expected)
+
+
+def test_flashlight():
+    engine = MPLEngine()
+    execute_command(engine, 'load Tests/test_files/flashlight.mpl')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?flashlight.battery.charge.empty')
+    assert tmp == {
+        Ref('flashlight.battery.charge.empty'): ev_fv(True),
+    }
+    execute_command(engine, 'flashlight.battery.level = 0.5')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?flashlight.battery.charge.low')
+    assert tmp == {
+        Ref('flashlight.battery.charge.low'): ev_fv(True),
+    }
+    tmp = execute_command(engine, '?flashlight.battery.charge.empty')
+    assert tmp == {
+        Ref('flashlight.battery.charge.empty'): ev_fv(),
+    }
+    tmp = execute_command(engine, 'flashlight.battery.level = 0')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?flashlight.battery.charge.empty')
+    assert tmp == {
+        Ref('flashlight.battery.charge.empty'): ev_fv(True),
+    }
+    tmp = execute_command(engine, '?flashlight.battery.charge.low')
+    assert tmp == {
+        Ref('flashlight.battery.charge.low'): ev_fv(),
+    }
+
+

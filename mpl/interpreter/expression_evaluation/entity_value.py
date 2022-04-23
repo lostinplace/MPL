@@ -230,18 +230,32 @@ def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, 
     #  when a conditiono results in a relational it is added to the result.
     #  references are ignored
 
-    if not y and comparison(1, 0):
-        return x or true_value
-    elif not y:
-        return false_value
-    elif y and not x and comparison(0, 1):
-        return true_value
-    if y and not x:
-        return false_value
+    # this is a dumb truthtable, I need to think this through better
+    match x, y:
+        case a, b if not a and not b and comparison(0, 0):
+            return x | true_value
+        case a, b if not a and not b:
+            return false_value
+        case _, b if not b and comparison(1, 0):
+            return x | true_value
+        case _, b if not b:
+            return false_value
+        case a, _ if not a and comparison(0, 1):
+            return true_value
+        case a, _ if not a:
+            return false_value
 
     x_relational = {a for a in x if isinstance(a, Relational)}
     y_relational = {a for a in y if isinstance(a, Relational)}
     all_relationals = x_relational | y_relational
+
+    x_has_true = {a for a in x if a is True or a is BooleanTrue()}
+    y_has_true = {a for a in y if a is True or a is BooleanTrue()}
+
+    if x_has_true:
+        x = ev_fv({a for a in x if a is not True and a is not BooleanTrue()})
+    if y_has_true:
+        y = ev_fv({a for a in y if a is not True and a is not BooleanTrue()})
 
     x_refs = {a for a in x if isinstance(a, Ref)}
     y_refs = {a for a in y if isinstance(a, Ref)}

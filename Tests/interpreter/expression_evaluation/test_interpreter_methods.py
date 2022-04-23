@@ -5,15 +5,16 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression
 from mpl.interpreter.expression_evaluation.interpreters.create_expression_interpreter import \
     create_expression_interpreter
+from mpl.lib import fs
 
 
 def test_get_references_from_assignment():
     expectations = {
         'a=b+1': {Ref('a'), Ref('b')},
-        'c += delta & echo + 5 - <sierra>': {Ref('delta'), Ref('echo'), Ref('sierra'), Ref('c')},
+        'c += delta & echo + 5 - <sierra>': {Ref('delta'), Ref('echo'), Ref('sierra', fs('trigger')), Ref('c')},
         'source thing += testing a complex string ^ <complex trigger>': {
             Ref('testing a complex string'),
-            Ref('complex trigger'),
+            Ref('complex trigger', fs('trigger')),
             Ref('source thing')
         },
         'd = `test`': {Ref('d')},
@@ -45,7 +46,11 @@ def test_get_references_from_scenario():
         '%{a}': {Ref('a')},
         '%{a & b}': {Ref('a'), Ref('b')},
         '%{a & b | c}': {Ref('a'), Ref('b'), Ref('c')},
-        '%{<trigger thing> & <other thing> | simple + 5}': {Ref('trigger thing'), Ref('other thing'), Ref('simple')},
+        '%{<trigger thing> & <other thing> | simple + 5}': {
+            Ref('trigger thing', fs('trigger')),
+            Ref('other thing', fs('trigger')),
+            Ref('simple')
+        },
     }
 
     for expr_input, expected in expectations.items():

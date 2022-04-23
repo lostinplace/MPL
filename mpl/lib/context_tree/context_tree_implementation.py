@@ -77,12 +77,12 @@ class ContextTree:
     def clear(self, ref: Reference | FrozenSet[Reference]) -> Dict[Reference, EntityValue]:
         return clear_references(self.root, ref)
 
-    def change(self, ref: Reference | str, value: EntityValue) -> Dict[Reference, EntityValue]:
+    def change(self, ref: Reference | str, value: EntityValue, update_types=False) -> Dict[Reference, EntityValue]:
         if isinstance(ref, str):
             ref = Reference(ref)
-        return change_node(self.root, ref, value)
+        return change_node(self.root, ref, value, update_types)
 
-    def update(self, other: Dict[Reference, EntityValue]) -> Dict[Reference, EntityValue]:
+    def update(self, other: Dict[Reference, EntityValue], update_types=False) -> Dict[Reference, EntityValue]:
         result = dict()
         for ref, value in other.items():
             new_value = None
@@ -91,7 +91,7 @@ class ContextTree:
                     new_value = new
                 case EntityValue() as new:
                     new_value = new
-            result |= self.change(ref, new_value)
+            result |= self.change(ref, new_value, update_types)
         return result
 
     def add(self, ref: Reference, value: EntityValue):
@@ -203,6 +203,9 @@ def add_child(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Oper
         case 1 if ref.name in node.children:
             existing_node = node.children[ref.name]
             change_node(existing_node, ref, value)
+            new_types = existing_node.ref.types | ref.types
+            existing_node.ref = dataclasses.replace(existing_node.ref, types=new_types)
+            node.children[ref.name] = existing_node
             return OperationResult.SUCCESS
         case x if x > 1:
             intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
@@ -271,11 +274,17 @@ def get_children_entity(node: ContextTreeNode) -> EntityValue:
     return result
 
 
+def void_children(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
+    results = {}
+    for child in node.children.values():
+        results |= void_node(child)
+    return results
+
+
 def void_node(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
     result = {}
     original_entity = node.entity
-    for _, v in node.children.items():
-        result |= void_node(v)
+    result |= void_children(node)
     node.value = false_value
     if node.entity != original_entity:
         result[node.ref] = node.entity
@@ -284,7 +293,7 @@ def void_node(node: ContextTreeNode) -> Dict[Reference, EntityValue]:
     return result
 
 
-def change_child_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
+def change_child_node(node: ContextTreeNode, ref: Reference, value: EntityValue, update_types=False) -> Dict[Reference, EntityValue]:
     result = {}
     intermediate_child_ref = get_intermediate_child_ref(node.ref, ref, 1)
     intermediate_child = node.children.get(intermediate_child_ref.name)
@@ -292,7 +301,7 @@ def change_child_node(node: ContextTreeNode, ref: Reference, value: EntityValue)
     if intermediate_child is None:
         intermediate_child = ContextTreeNode(intermediate_child_ref)
         node.children[intermediate_child_ref.name] = intermediate_child
-    result |= change_node(intermediate_child, ref, value)
+    result |= change_node(intermediate_child, ref, value, update_types)
     child_value = get_children_entity(node)
     node.value = node.value.without(child_value)
     if node.entity != original_value:
@@ -301,7 +310,7 @@ def change_child_node(node: ContextTreeNode, ref: Reference, value: EntityValue)
     return result
 
 
-def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Dict[Reference, EntityValue]:
+def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue, update_types=False) -> Dict[Reference, EntityValue]:
     value = EntityValue.from_value(value)
     changes = {}
     degree = reference_is_child_of_reference(ref, node.ref)
@@ -309,6 +318,7 @@ def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Di
         case -1:
             pass
         case 0 if refs_are_compatible(ref, node.ref):
+            # change this node
             from_children = get_children_entity(node)
             not_handled_by_children = value.without(from_children)
             old_void = node.void_value
@@ -316,16 +326,27 @@ def change_node(node: ContextTreeNode, ref: Reference, value: EntityValue) -> Di
             node.value = not_handled_by_children
             new_void = node.void_value
             new_entity = node.entity
+            if update_types:
+                new_types = node.ref.types | ref.types
+                node.ref = dataclasses.replace(node.ref, types=new_types)
             if hash(old_entity) != hash(new_entity):
                 changes[node.ref] = new_entity
             if old_void != new_void:
                 changes[node.ref.void] = new_void
+        case 1 if ref.is_void and node.ref.name == 'ROOT':
+            # you can pitch into the root's void infinitely
+            return {}
         case 1 if ref.is_void and value:
             changes |= void_node(node)
-        case 1 if ref.is_void:
-            pass
+        case 1 if ref.is_void and not value:
+            # consuming the void
+            if node.void_value:
+                changes |= change_node(node, ref.parent, true_value)
+        case 1 if 'state' in node.ref.types and value:
+            changes |= void_children(node)
+            changes |= change_child_node(node, ref, value, update_types)
         case _:
-            changes |= change_child_node(node, ref, value)
+            changes |= change_child_node(node, ref, value, update_types)
 
     return changes
 
@@ -334,8 +355,6 @@ def clear_references(node: ContextTreeNode, references: FrozenSet[Reference]) ->
     changes = {}
     # TODO: figure out what it means to consume a void reference
     for item in references:
-        if item.is_void:
-            continue
         changes |= change_node(node, item, EntityValue())
     return changes
 

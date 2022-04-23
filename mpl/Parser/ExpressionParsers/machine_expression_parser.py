@@ -12,7 +12,7 @@ from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, 
 from mpl.Parser.ExpressionParsers.query_expression_parser import VectorExpression, VectorExpressionParsers
 
 from mpl.lib.parsers.additive_parsers import track, TrackedValue
-from mpl.lib.parsers.custom_parsers import check
+from mpl.lib.parsers.custom_parsers import check, debug
 from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
 
 
@@ -55,6 +55,12 @@ class MachineFile:
 
             return MachineFile(lines, dict(context_items))
         return MachineFile(lines)
+
+
+def debugger(*args, **kwargs):
+    print(*args, **kwargs)
+    # result = args[0].parse(args[1])
+    return args[0]
 
 
 class MachineDefinitionExpressionParsers(TextParsers, whitespace=None):

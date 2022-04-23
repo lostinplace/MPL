@@ -18,7 +18,6 @@ class RuleEvaluation:
     source: str
     context: ContextTree
 
-
 RE = RuleEvaluation
 
 
@@ -26,9 +25,7 @@ def quick_change(start, end):
     return ev_fv(start), ev_fv(end)
 
 
-def test_evaluate_rule():
-
-    input_contexts = {
+input_contexts = {
         'simple': {
             Reference('a'): ev_fv(1),
             Reference('b'): ev_fv(),
@@ -57,6 +54,9 @@ def test_evaluate_rule():
         }
 
     }
+
+
+def test_evaluate_rule():
     contexts = {}
 
     for k, values in input_contexts.items():
@@ -64,6 +64,16 @@ def test_evaluate_rule():
         contexts[k] = ctx
 
     expectations = {
+        ('b.* -> d', contexts['simple with c and d']): RuleInterpretation(
+            RuleInterpretationState.APPLICABLE,
+            {
+                Reference('b'): quick_change({}, True),
+                Reference('b.*'): quick_change(True, {}),
+                Reference('d'): quick_change({}, True),
+                Reference('d.*'): quick_change(True, {}),
+            },
+            source='b.* -> d',
+        ),
         ('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
             {

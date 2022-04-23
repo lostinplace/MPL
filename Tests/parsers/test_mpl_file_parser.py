@@ -9,6 +9,12 @@ def test_mpl_file_parser_doesnt_fail():
     assert result
 
 
+def test_mpl_file_parser_doesnt_fail_flashlight():
+    result = MachineFile.from_file('Tests/test_files/flashlight.mpl')
+
+    assert result
+
+
 def test_parsing_with_context():
     actual = MachineFile.from_file('Tests/test_files/simplest.mpl')
 

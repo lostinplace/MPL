@@ -1,19 +1,17 @@
 from dataclasses import dataclass
 from enum import Enum, auto, IntFlag
-from typing import List, Set, FrozenSet, Optional
+from typing import List, Optional
 
 from parsita import TextParsers, opt, Success, reg, longest, repsep, lit
 from parsita.util import splat
 
 from mpl.Parser.ExpressionParsers.assignment_expression_parser \
     import AssignmentExpression, AssignmentExpressionParsers as AExpP
-from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser \
     import ReferenceExpression, ReferenceExpressionParsers as RefExP, Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers
 from mpl.interpreter.reference_resolution.mpl_ontology import engine_to_string
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
-from mpl.lib import fs
 
 """
 Command	Effect
@@ -207,15 +205,3 @@ class CommandParsers(TextParsers):
     system = quit | help | list | clear
 
     command = longest(system, tick, activate, deactivate, explore, add_rule, query, load, save, RuleExpressionParsers.expression)
-
-
-def test_command_parsing():
-    expectations = {
-        'load /foo/bar': LoadCommand('/foo/bar'),
-        'load context from /foo/bar': LoadCommand('/foo/bar', MemoryType.CONTEXT),
-        'load rules from foo/bar': LoadCommand('foo/bar', MemoryType.RULES),
-        'save scratch.mpl': SaveCommand('scratch.mpl', MemoryType.ALL),
-    }
-
-    for input, expected in expectations.items():
-        assert CommandParsers.command.parse(input) == Success(expected)

@@ -15,13 +15,12 @@ from numbers import Number
 
 from sympy import Symbol
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union, List, FrozenSet
+from typing import Optional, Tuple, Union, List, FrozenSet, Iterable
 
-from parsita import TextParsers, opt, repsep, Success, lit, longest
+from parsita import TextParsers, opt, repsep, lit, longest
 from parsita.util import splat
 
 from mpl.Parser.Tokenizers.simple_value_tokenizer import SimpleValueTokenizers as svt, ReferenceToken
-from mpl.lib import fs
 
 
 def sanitize_reference_name(name: str) -> str:
@@ -100,6 +99,11 @@ class Reference:
     @property
     def without_types(self) -> 'Reference':
         return dataclasses.replace(self, types=frozenset())
+
+    def with_types(self, types: Union[str, Iterable[str]]) -> 'Reference':
+        if isinstance(types, str):
+            types = {types}
+        return dataclasses.replace(self, types=frozenset(types))
 
     def is_child_of(self, other: 'Reference') -> bool:
         return self.name.startswith(other.name + '.')
@@ -217,17 +221,3 @@ class ReferenceExpressionParsers(TextParsers, whitespace=r'[ \t]*'):
     expression = longest(void_expression, reference_expression)
 
 
-def test_reference_expression_parsing():
-
-    expectations = {
-        'test me': Reference('test me'),
-        'base.test me': Reference('base.test me'),
-        'base.test me:int': Reference('base.test me', fs('int')),
-    }
-
-    for input, expected in expectations.items():
-        result = ReferenceExpressionParsers.expression.parse(input)
-        assert isinstance(result, Success)
-        expression = result.value
-        actual = expression.reference
-        assert actual == expected, input

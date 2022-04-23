@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from random import random, randint
 from typing import Set, Dict, Tuple, Any, Iterable, FrozenSet, Optional
 
 from networkx import MultiDiGraph
@@ -39,24 +40,23 @@ class MPLEngine:
             rules = {rules}
 
         new_graph = construct_graph_from_expressions(rules)
-        graph = combine_graphs(self.graph, new_graph)
-        new_context = EngineContext.from_graph(graph)
-        context, changes = new_context.update(self.context)
+        self.graph = combine_graphs(self.graph, new_graph)
+        new_context = EngineContext.from_graph(self.graph)
+        self.context, changes = new_context.update(self.context)
 
-        interpreters = {RuleInterpreter.from_expression(rule) for rule in rules} | self.rule_interpreters
-
-        return MPLEngine(interpreters, context, self.history, graph)
+        self.rule_interpreters = {RuleInterpreter.from_expression(rule) for rule in rules} | self.rule_interpreters
+        return self
 
     def remove(self, rules: RuleExpression | Set[RuleExpression]) -> 'MPLEngine':
         if not isinstance(rules, Iterable):
             rules = {rules}
 
-        new_interpreters = \
+        self.rule_interpreters = \
             {interpreter for interpreter in self.rule_interpreters if interpreter.expression not in rules}
-        expressions = {interpreter.expression for interpreter in new_interpreters}
-        new_graph = drop_from_graph(expressions, self.graph)
+        expressions = {interpreter.expression for interpreter in self.rule_interpreters}
+        self.graph = drop_from_graph(expressions, self.graph)
 
-        return MPLEngine(new_interpreters, self.context, self.history, new_graph)
+        return self
 
     def execute_expression(self, expression: RuleExpression) -> Dict[Reference, context_diff]:
         interpreter = RuleInterpreter.from_expression(expression)
@@ -76,14 +76,14 @@ class MPLEngine:
         self.history = (all_changes,) + self.history
         return all_changes
 
-    def execute_interpreters(self, interpreters: FrozenSet[RuleInterpreter]) -> context_diff:
+    def execute_interpreters(self, interpreters: FrozenSet[RuleInterpreter], seed=1) -> context_diff:
 
         interpretations = {interpreter.interpret(self.context) for interpreter in interpreters}
         applicable = frozenset({x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE})
         if not applicable:
             return dict()
         conflicts = identify_conflicts(applicable)
-        resolved = resolve_conflict_map(conflicts, 1)
+        resolved = resolve_conflict_map(conflicts, seed)
         resolved_changes = compress_interpretations(resolved)
         self.context, changes = self.context.update(resolved_changes)
         return changes
@@ -93,7 +93,8 @@ class MPLEngine:
         if count > 0:
             #  tick forward
             for tick in range(count):
-                output |= self.execute_interpreters(frozenset(self.rule_interpreters))
+                seed = randint(0, 1000)
+                output |= self.execute_interpreters(frozenset(self.rule_interpreters), seed=seed)
             self.history = (output,) + self.history
         elif count < 0:
             # tick backward
@@ -112,8 +113,7 @@ class MPLEngine:
         diff_change = dict()
         diff_descriptors = list()
         for key, diff_item in diff.items():
-            key = Reference(key)
-            diff_change[key] = EntityValue.from_value(diff_item[0])
+            diff_change[key] = diff_item[0]
             descriptor = f'{key}::{diff_item[1]}→{diff_item[0]}'
             diff_descriptors.append(descriptor)
         name = ';'.join(diff_descriptors)
@@ -142,3 +142,6 @@ class MPLEngine:
         edges = self.graph.edges(data='relationship')
         edges_as_set = frozenset(edges)
         return hash((context_hash, frozenset(self.rule_interpreters), edges_as_set, self.history))
+
+    def __str__(self):
+        return f'MPLEngine({self.context}, {self.rule_interpreters}, {self.history})'

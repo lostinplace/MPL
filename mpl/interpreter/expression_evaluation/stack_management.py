@@ -37,6 +37,8 @@ def get_postfix_operand(operand: Expression, operation_dict: Dict[str, OperatorO
             return x.reference.without_types
         case TriggerExpression() as x:
             return x.name.reference
+        case x if x is True:
+            return True
 
 
 def flat_append(out: List, operand: str | Number | Reference | List):
@@ -115,6 +117,8 @@ def evaluate_symbolized_postfix_stack(
             case Number() | str():
                 result[index] = EntityValue.from_value(item)
                 index += 1
+            case EntityValue():
+                index += 1
             case Expr() | Relational():
                 tmp = entity_value_from_expression(item, context)
                 result[index] = tmp
@@ -128,6 +132,10 @@ def evaluate_symbolized_postfix_stack(
                 result[index - 2] = tmp
                 del result[index - 1: index + 1]
                 index -= 1
+                pass
+            case x:
+                pass
+        pass
 
     assert len(result) == 1
     out = result[0]

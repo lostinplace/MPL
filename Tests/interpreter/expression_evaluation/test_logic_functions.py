@@ -1,6 +1,10 @@
+from typing import Tuple, Optional
+
+from sympy.core.relational import Relational, StrictLessThan, GreaterThan, LessThan
+
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
 
-from sympy import abc, N, symbols, Symbol
+from sympy import abc, N, symbols, Symbol, StrictGreaterThan, Eq, solve_univariate_inequality, solve, Expr
 
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 
@@ -207,141 +211,150 @@ def test_logical_gt():
     bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
     cost = ev_fv(cost_expr)
-    ev_fv(2 * red < -12, 2 * red < 20, 5 * black + 3 * red > 2 * red, 5 * black + 3 * red > 6.0)
 
     expectations = {
-        (ev_fv(abc.d), ev_fv()): ev_fv(abc.d),
-        (ev_fv(-12, 20) | bank, ev_fv(N(6)) | cost):
-            ev_fv({5*black + 3*red > 6.0, red < -6, red < 10, red > -5*black}),
-        (bank - cost, bank): ev_fv({red < 0}),
-        (ev_fv(32, 20) | bank, ev_fv(6) | cost): ev_fv(32, 20) | bank,
-        (bank | 20, ev_fv(6)): bank | 20,
-        (ev_fv(6), ev_fv(12)): ev_fv(),
-        (ev_fv(abc.d), ev_fv(6)): ev_fv(abc.d > 6),
-        (ev_fv(12), ev_fv(6)): ev_fv(12),
-        (ev_fv(N(12)), ev_fv(6)): ev_fv(N(12)),
+        (
+            ev_fv(red > 3, red < 7),
+            ev_fv(red > 9)
+        ): ev_fv(),
+        (
+            ev_fv(red, red > 3, black < 5),
+            ev_fv(1, red > 12, black < -2)
+        ): ev_fv(red, red > 12, black < -2),
+        (
+            ev_fv(Ref('b'), red, 12),
+            ev_fv(14)
+        ): ev_fv(Ref('b'), red, red > 14, 12).with_p(1/2),
+        (
+            ev_fv(12),
+            ev_fv(6)
+        ): ev_fv(12),
+        (
+            ev_fv(N(12)),
+            ev_fv(6)
+        ): ev_fv(N(12)),
+        (
+            ev_fv(-12, 20) | bank,
+            ev_fv(N(6)) | cost
+        ):
+            ev_fv({-12, -6 > red, 20, 5*black + 3*red, black > -red/5, black > 1.2 - 0.6*red}).with_p(5/6),
+        (
+            ev_fv(abc.d),
+            ev_fv()
+        ): ev_fv(abc.d),
+        (
+            bank - cost,
+            bank
+        ): EntityValue(value=frozenset({0 > red, 5*black + red}), p=1.0),
+        (
+            ev_fv(32, 20) | bank,
+            ev_fv(6) | cost
+        ): ev_fv(32, 20) | bank,
+        (
+            bank | 20,
+            ev_fv(6)
+        ): bank | 20,
+        (
+            ev_fv(6),
+            ev_fv(12)
+        ): ev_fv(),
+        (
+            ev_fv(abc.d),
+            ev_fv(6)
+        ): ev_fv(abc.d > 6, abc.d),
 
     }
 
-    for value, expected in expectations.items():
-        x = ev_fv(value[0])
-        y = ev_fv(value[1])
+    for (x, y), expected in expectations.items():
         actual = x > y
-        assert actual == expected, value
+        assert actual == expected, f'{x} > {y}'
 
 
 def test_logical_eq():
     cost_expr = 3 * Ref('red') + 5 * Ref('black')
-    bank = EntityValue(ev_fv(cost_expr))
-    cost = EntityValue(ev_fv(cost_expr))
+    bank = cost_expr
+    cost = cost_expr
 
     expectations = {
-        (bank, ev_fv(cost)): ev_fv(bank, cost),
-        (ev_fv(12, bank), ev_fv(N(12), bank)): ev_fv(12, bank, N(12)),
-        (ev_fv(12, 20), ev_fv(12, 20)): ev_fv(12, 20),
-        (ev_fv(12, 20), ev_fv(12, 20,6)): ev_fv(),
-        (ev_fv(12, 20, 6), ev_fv(12, 20)): ev_fv(),
-        (ev_fv(12), ev_fv(N(12))): ev_fv(12, N(12)),
+        (
+            ev_fv(15, Ref('ok'), red, black > 13),
+            ev_fv(N(15), Ref('not ok'), 19, black > 17)
+        ): ev_fv(15, N(15), Ref('ok'), Ref('not ok'), Eq(red, 19), black > 17),
+        (
+            ev_fv(15, Ref('ok'), red),
+            ev_fv(N(15), Ref('ok'), 19, black > 17)
+        ): ev_fv(15, N(15), Ref('ok'), Eq(red, 19), black > 17),
+        (
+            ev_fv(15, Ref('ok'), red),
+            ev_fv(N(15), Ref('ok'), 19)
+        ): ev_fv(15, N(15), Ref('ok'), Eq(red, 19)),
+        (
+            ev_fv(15, Ref('ok'), red > 3),
+            ev_fv(N(15), Ref('ok'), red > 5)
+        ): ev_fv(15, N(15), Ref('ok'), red > 5),
+        (
+            ev_fv(3, 'test', Ref('ok'), red-3),
+            ev_fv(3, 'test', Ref('ok'), black + 2)
+        ): ev_fv(3, 'test', Ref('ok'), Eq(red - 3, black + 2)),
+        (
+            ev_fv(bank), ev_fv(cost)
+        ): ev_fv(bank, cost),
+        (
+            ev_fv(12, bank),
+            ev_fv(N(12), bank)
+        ): ev_fv(12, N(12), bank),
+        (
+            ev_fv(12, 20),
+            ev_fv(12, 20)
+        ): ev_fv(12, 20),
+        (
+            ev_fv(12, 20),
+            ev_fv(12, 20, 6)
+        ): ev_fv(),
+        (
+            ev_fv(12, 20, 6),
+            ev_fv(12, 20)
+        ): ev_fv(),
+        (
+            ev_fv(12),
+            ev_fv(N(12))
+        ): ev_fv(12, N(12)),
     }
 
-    for value, expected in expectations.items():
-        x = ev_fv(value[0])
-        y = ev_fv(value[1])
-        actual = x == y
-        assert actual == expected, value
+    for (o, B), expectation in expectations.items():
+        actual = o == B
+        assert actual == expectation
 
 
 def test_logical_inequality_comparisons():
 
-    bank = EntityValue(ev_fv(3 * Ref('red') + 5 * Ref('black')))
+    bank = ev_fv(3 * Ref('red') + 5 * Ref('black'))
     cost_expr = 2 * Ref('red')
-    cost = EntityValue(ev_fv(cost_expr))
+    cost = ev_fv(cost_expr)
 
-    expectations = {
-        (ev_fv(), ev_fv(abc.d)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(1),
-            EntityValue.__ge__: ev_fv(),
-            EntityValue.__le__: ev_fv(1),
-        },
-        (ev_fv(bank, -12, 20), ev_fv(26, cost, 20)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(),
-            EntityValue.__le__: ev_fv(bank, -12, 20),
-        },
-        (ev_fv(bank, -12, 20), ev_fv(N(6), cost)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(bank, -12, 20), ev_fv(6, cost)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(bank, 32, 20), ev_fv(6, cost)): {
-            EntityValue.__gt__: ev_fv(bank, 32, 20),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(bank, 32, 20),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(bank,  20), ev_fv(6)): {
-            EntityValue.__gt__: ev_fv(bank, 20),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(bank, 20),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(bank, 20), ev_fv(20)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(bank, 20),
-            EntityValue.__le__: ev_fv(bank, 20),
-        },
-        (ev_fv(6), ev_fv(12)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(6),
-            EntityValue.__ge__: ev_fv(),
-            EntityValue.__le__: ev_fv(6),
-        },
-        (ev_fv(12), ev_fv(12)): {
-            EntityValue.__gt__: ev_fv(),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(12),
-            EntityValue.__le__: ev_fv(12),
-        },
-        (ev_fv(abc.d), ev_fv(6)): {
-            EntityValue.__gt__: ev_fv(abc.d > 6),
-            EntityValue.__lt__: ev_fv(abc.d < 6),
-            EntityValue.__ge__: ev_fv(abc.d >= 6),
-            EntityValue.__le__: ev_fv(abc.d <= 6),
-        },
-        (ev_fv(abc.d), ev_fv()): {
-            EntityValue.__gt__: ev_fv(abc.d),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(abc.d),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(12), ev_fv(6)): {
-            EntityValue.__gt__: ev_fv(12),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(12),
-            EntityValue.__le__: ev_fv(),
-        },
-        (ev_fv(N(12)), ev_fv(6)): {
-            EntityValue.__gt__: ev_fv(N(12)),
-            EntityValue.__lt__: ev_fv(),
-            EntityValue.__ge__: ev_fv(N(12)),
-            EntityValue.__le__: ev_fv(),
-        },
+    e_1 = ev_fv(1, -1, Ref('lowest'), red)
+    e_2 = ev_fv(2, 3, Ref('higher than lowest'), black)
+    e_3 = ev_fv(3, 4)
+    e_4 = ev_fv(5, 6)
 
-    }
-
-    for value, expected in expectations.items():
-        for op, expected_op in expected.items():
-            x = ev_fv(value[0])
-            y = ev_fv(value[1])
-            actual = op(x, y)
-            assert actual == expected_op, value
+    tmp = e_1 > ev_fv()
+    assert tmp == e_1
+    tmp = e_2 > e_1
+    assert tmp == ev_fv(2, 3, Ref('higher than lowest'), black > 1, black > red, 2 > red, black)
+    tmp = e_1 > e_2
+    assert tmp == ev_fv(-1, 1, Ref('lowest'), black < -1, black < red, red, red > 3).with_p(2/3)
+    tmp = e_1 < e_2
+    assert tmp == ev_fv(-1, 1, Ref('lowest'), black > 1, black > red, red, red < 2)
+    tmp = e_3 > e_4
+    assert tmp == ev_fv()
+    tmp = e_3 < e_4
+    assert tmp == e_3
+    tmp = e_4 > e_3
+    assert tmp == e_4
+    tmp = bank - cost > ev_fv(0)
+    assert tmp
+    bankrupt = ev_fv(bank) - ev_fv(12*red + 20* black)
+    tmp = bankrupt > ev_fv(red >= 1, black >= 1)
+    # TODO: this is not correct, need to implement multivarriate inequality solver from here:
+    # https://www.dcsc.tudelft.nl/~bdeschutter/pub/rep/93_71.pdf
+    # assert not tmp

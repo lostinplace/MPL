@@ -1,4 +1,4 @@
-from random import Random
+from random import Random, random
 
 import networkx as nx
 
@@ -7,7 +7,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, get_current_path, PathInfo, \
     get_edges_by_type, Relationship, engine_to_string
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
 
 """
 edge_types:
@@ -71,8 +71,7 @@ def test_context_generation():
 def test_context_generation_with_context():
     machine_file = MachineFile.from_file('Tests/test_files/simplest.mpl')
     context, graph = process_machine_file(machine_file)
-    assert context[Ref('One')] == EntityValue('One', frozenset({1}))
-
+    assert context[Ref('One')] == ev_fv(1)
 
 
 def test_combinations():
@@ -147,18 +146,17 @@ def test_engine_to_string():
 
     for test_file in test_files:
         original_engine = MPLEngine.from_file(test_file)
-        rnd = Random(0)
-        key = rnd.choice(list(original_engine.context.keys()))
-        original_engine.activate(key)
+        selected_keys = [x for x in original_engine.context if random() < 0.35 and x.name != 'ROOT']
+
+        for key in selected_keys:
+            original_engine.activate(key)
 
         content = engine_to_string(original_engine)
         mf = MachineFile.parse(content)
         new_engine = MPLEngine.from_file(mf)
-        assert original_engine.context == new_engine.context
-        assert original_engine.rule_interpreters == new_engine.rule_interpreters
+        assert new_engine.context == original_engine.context
+        assert new_engine.rule_interpreters == original_engine.rule_interpreters
         original_graph = set(original_engine.graph.edges(data='relationship'))
         new_graph = set(new_engine.graph.edges(data='relationship'))
-        assert original_graph == new_graph
-        assert hash(original_engine) == hash(new_engine)
-
-
+        unaccounted_for_edges = original_graph-new_graph
+        assert not unaccounted_for_edges

@@ -1,9 +1,9 @@
 import os
 from functools import reduce
-from typing import Tuple, Any, Dict
+from typing import Dict
 
 from parsita import Success
-from prompt_toolkit import print_formatted_text as print, HTML
+from prompt_toolkit import print_formatted_text as print_f
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
@@ -14,7 +14,6 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
-from mpl.interpreter.conflict_resolution import identify_conflicts, resolve_conflict_map
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file
@@ -76,7 +75,10 @@ def format_data_for_cli_output(response, interior=True) -> str:
     match response:
         case str():
             result = response
-        case dict() | EngineContext():
+        case EngineContext():
+            tmp = response.to_dict()
+            return format_data_for_cli_output(tmp, interior=False)
+        case dict():
             results = []
             for k, v in response.items():
                 k_out = format_data_for_cli_output(k)
@@ -111,9 +113,9 @@ def format_data_for_cli_output(response, interior=True) -> str:
         case EntityValue():
             if response.value:
                 contents = format_data_for_cli_output(response.value)
-                result = f'Entity({contents})'
+                result = str(contents)
             else:
-                result = ''
+                result = '{}'
         case _:
             result = str(response)
     return result
@@ -137,7 +139,7 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             result = engine.execute_interpreters({interpreter})
             return result
         case AddRuleCommand():
-            engine.add(value.expression)
+            engine = engine.add(value.expression)
             return f'Incorporated Rule: {value.expression}'
         case DropRuleCommand():
             engine.remove(value.expression)
@@ -148,18 +150,19 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             return engine
         case LoadCommand(path, MemoryType.RULES):
             new_engine = MPLEngine.from_file(path)
-            new_engine.context |= engine.context
-            return new_engine
+            engine.graph = new_engine.graph
+            engine.rule_interpreters |= new_engine.rule_interpreters
+            return engine
         case LoadCommand(path, MemoryType.ALL):
-            engine = MPLEngine.from_file(path)
+            new_engine = MPLEngine.from_file(path)
+            engine.graph = new_engine.graph
+            engine.rule_interpreters |= new_engine.rule_interpreters
+            engine.context |= new_engine.context
             return engine
         case SaveCommand():
             value.save(engine)
         case TickCommand():
-            start_context = engine.context
-            engine.tick(value.number)
-            end_context = engine.context
-            result = start_context.get_diff(end_context)
+            result = engine.tick(value.number)
             return result
         case ExploreCommand() as explore_command:
             # TODO: explore command
@@ -190,11 +193,8 @@ def execute_command(engine: MPLEngine, command: str) -> MPLEngine | str | System
             interpreter = RuleInterpreter.from_expression(re)
             rule_context = EngineContext.from_interpreter(interpreter)
             engine.context = rule_context | engine.context
-            result = interpreter.interpret(engine.context)
-            conflicts = identify_conflicts([result])
-            resolved = resolve_conflict_map(conflicts, 1)
-            result = engine.apply(resolved)
-            return result
+            results = engine.execute_interpreters(frozenset({interpreter}))
+            return results
         case _:
             return f'Unknown command: {value}'
 
@@ -248,7 +248,7 @@ def run_interactive_session():
             case SystemCommand.QUIT:
                 return
         output = format_data_for_cli_output(command_result, False)
-        print(output)
+        print_f(output)
 
 
 if __name__ == '__main__':

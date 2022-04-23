@@ -37,7 +37,7 @@ class QueryExpressionInterpreter(ExpressionInterpreter):
         for symbol in qri.symbolized:
             match symbol:
                 case Expr() | Relational():
-                    symbols = symbol.free_symbols
+                    symbols = {x for x in symbol.free_symbols if '`' not in str(x)}
                     decoded = {Reference.decode(symbol) for symbol in symbols}
                     result |= decoded
 

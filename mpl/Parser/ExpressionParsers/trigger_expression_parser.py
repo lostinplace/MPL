@@ -7,8 +7,7 @@ from parsita.util import splat
 
 from mpl.Parser.ExpressionParsers import Expression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceExpression, \
-    ReferenceExpressionParsers as refxp, \
-    Reference
+    ReferenceExpressionParsers as refxp
 
 
 @dataclass(frozen=True, order=True)
@@ -20,7 +19,7 @@ class TriggerExpression(Expression):
     def __str__(self):
         source_str = f"{self.source} " if self.source else ""
         message_str = f"{self.messages} " if self.messages else ""
-        return f"{source_str}<{self.name}>{message_str}"
+        return f"{source_str}<{self.name.reference.without_types}>{message_str}"
 
     def __repr__(self):
         return f"Trigger({self.name})"
@@ -50,7 +49,8 @@ class TriggerExpression(Expression):
     ) -> 'TriggerExpression':
         source = source_expression[0] if source_expression else None
         messages = tuple(messages) if messages else None
-        return TriggerExpression(name_expression, source=source, messages=messages)
+        typed_name_expression = dataclasses.replace(name_expression, types=frozenset({'trigger'}))
+        return TriggerExpression(typed_name_expression, source=source, messages=messages)
 
 
 class TriggerExpressionParsers(TextParsers, whitespace=r'[ \t]*'):

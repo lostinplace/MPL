@@ -5,7 +5,6 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.entity_value import ev_fv
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
-from mpl.lib import fs
 
 
 def test_basic_operations():
@@ -42,6 +41,7 @@ def test_basic_operations():
     assert actual == ev_fv(1)
 
     trials = 100
+    tolerance = 0.075
     hit_5 = 0
     hit_two = 0
     random.seed(0)
@@ -66,9 +66,10 @@ def test_basic_operations():
         assert not still_active
 
     assert hit_5 == trials
-    min = trials / 2 * 0.95
-    max = trials / 2 * 1.05
-    assert hit_two > min and hit_two < max
+    from sympy import Interval
+    acceptable_hit_two_range = Interval(trials/2 * (1-tolerance), trials/2 * (1+tolerance))
+
+    assert hit_two in acceptable_hit_two_range
 
 
 def test_evaluate_rule_from_wumpus_file():

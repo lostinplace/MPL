@@ -1,12 +1,12 @@
 import dataclasses
-from typing import FrozenSet, Dict, Union, Set, Tuple, Optional
+from typing import FrozenSet, Dict, Union, Set, Tuple, Optional, Iterator
 
 from networkx import MultiDiGraph
 from sympy import Symbol
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
-from mpl.lib.context_tree.context_tree_implementation import ContextTree
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, false_value
+from mpl.lib.context_tree.context_tree_implementation import ContextTree, get_node_by_ref
 
 ref_name = Union[str, Ref]
 
@@ -25,10 +25,20 @@ class EngineContext:
     """
     EngineContext are immutable, any time you omake a change, you receive a new context along with the change manifest
     """
-    tree: ContextTree = ContextTree()
+    tree: ContextTree = dataclasses.field(default_factory=ContextTree)
 
     def __getitem__(self, item: Reference) -> 'EntityValue':
         return self.tree[item]
+
+    def __iter__(self) -> Iterator[Reference]:
+        keys = set()
+        for ref in self.tree:
+            if not ref[0].is_void:
+                keys.add(ref[0])
+        return keys.__iter__()
+
+    def __contains__(self, item: Reference) -> bool:
+        return item in self.tree
 
     # region Modifiers
     # these methods return a new context with the changes applied
@@ -49,7 +59,7 @@ class EngineContext:
         match other:
             case EngineContext():
                 other = other.to_dict()
-        changes = new_tree.update(other)
+        changes = new_tree.update(other, True)
         qd = quick_diff(changes, self.tree)
         return EngineContext(new_tree), qd
 
@@ -65,7 +75,7 @@ class EngineContext:
 
     def activate(self, ref: ref_name | Set[ref_name], value=None) -> Tuple['EngineContext', context_diff]:
         if value is None:
-            value = EntityValue.from_value(value or 1)
+            value = EntityValue.from_value(value or True)
 
         target_tree = self.tree.__copy__()
         changes = {}
@@ -96,7 +106,10 @@ class EngineContext:
 
     @property
     def active(self) -> Dict[Reference, EntityValue]:
-        return {ref: value for ref, value in self.tree if value and not ref.is_void}
+        return {
+            ref: value for ref, value in self.tree
+            if value and not ref.is_void
+        }
 
     @property
     def ref_names(self) -> FrozenSet[str]:
@@ -104,8 +117,16 @@ class EngineContext:
 
     @staticmethod
     def from_graph(graph: MultiDiGraph) -> 'EngineContext':
+        from mpl.interpreter.reference_resolution.mpl_ontology import Relationship
+
         references = frozenset({x for x in graph.nodes if isinstance(x, Reference)})
-        return EngineContext.from_references(references)
+        typed_refs: Set[Reference] = set()
+        for ref in references:
+            type_edges = graph.out_edges(ref, data='relationship')
+            types = {x[1] for x in type_edges if x[2] == Relationship.IS_A}
+            this_ref = ref.with_types(types) if not ref == Ref('ROOT') else ref
+            typed_refs.add(this_ref)
+        return EngineContext.from_references(typed_refs)
 
     @staticmethod
     def from_dict(d: Dict[Reference, EntityValue]) -> 'EngineContext':
@@ -119,7 +140,9 @@ class EngineContext:
         for ref in references:
             # TODO: this doesn't differentiate between different types of entities, e.g. triggers.
             #  Figure out how these should be handled in the  reference graph and update it here.
-            result.tree.add(ref, EntityValue(value=frozenset()))
+
+            result.tree.add(ref, false_value)
+
         return result
 
     @staticmethod
@@ -153,10 +176,30 @@ class EngineContext:
     def get_diff(self, other: 'EngineContext') -> context_diff:
         return EngineContext.diff(self, other)
 
+    @property
+    def whole_dict(self) -> Dict[Reference, 'EntityValue']:
+        return {
+            ref: value for ref, value in self.tree
+            if not ref.is_void
+        }
+
+    @property
+    def active_dict(self) -> Dict[Reference, 'EntityValue']:
+        return {
+            ref: value for ref, value in self.tree
+            if value and not ref.is_void
+        }
+
     def __str__(self):
-        items = [(x[0].name, x[1]) for x in self.active.items()]
+        items = {}
+
+        for ref in self.active:
+            tmp = get_node_by_ref(self.tree.root, ref)
+            if tmp.value:
+                items[ref.name] = tmp.value
+
         lines = []
-        for key, value in items:
+        for key, value in items.items():
             value_component = ','.join(str(x) for x in value)
             lines.append(f'{key}: {{{value_component}}}')
         sorted_lines = sorted(lines)
@@ -167,3 +210,9 @@ class EngineContext:
 
     def __hash__(self):
         return hash(self.tree)
+
+    def __eq__(self, other):
+        return self.tree == other.tree
+
+    def __keys__(self):
+        return self.tree.__keys__()

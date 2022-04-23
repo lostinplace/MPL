@@ -3,9 +3,11 @@ import itertools
 from typing import FrozenSet
 
 from sympy import Symbol, Expr
-from sympy.core.relational import Relational
+from sympy.core.relational import Relational, Eq
+from sympy.logic.boolalg import BooleanTrue, BooleanFalse
 
-from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, Ref
+from mpl.lib.relational_math import simplify_relational_set
 
 
 @dataclasses.dataclass(frozen=True)
@@ -46,8 +48,19 @@ class EntityValue:
 
     @property
     def clean(self):
-        only_truth = frozenset(x for x in self.value if x)
-        return EntityValue(only_truth)
+        truthy_vals = {x for x in self.value if x}
+        if len([x for x in truthy_vals if not isinstance(x, Ref)]) > 1:
+            tmp = frozenset(x for x in truthy_vals if not x is True)
+            return EntityValue(tmp)
+        return EntityValue(frozenset(truthy_vals), self.p)
+
+    @property
+    def organize_relationals(self):
+        relations = {x for x in self.value if isinstance(x, Relational)}
+        remaining = self.value - relations
+        simplified = simplify_relational_set(relations)
+        new_values = remaining | simplified
+        return EntityValue(new_values, self.p)
 
     @property
     def free_symbols(self) -> FrozenSet[Symbol]:
@@ -56,6 +69,19 @@ class EntityValue:
             if isinstance(item, Expr):
                 result |= item.free_symbols
         return frozenset(result)
+
+    @property
+    def expressions(self) -> FrozenSet[Expr]:
+        return frozenset(x for x in self.value if isinstance(x, (Expr, Relational)))
+
+    def __iter__(self):
+        return iter(self.value)
+
+    def with_p(self, p: float) -> 'EntityValue':
+        return dataclasses.replace(self, p=p)
+
+    def without(self, other: 'EntityValue'):
+        return EntityValue(self.value - other.value)
 
     def __or__(self, other):
         match other:
@@ -74,12 +100,11 @@ class EntityValue:
         value_str = ', '.join(str(v) for v in values)
         return f'{{{value_str}}}'
 
-    def without(self, other: 'EntityValue'):
-        return EntityValue(self.value - other.value)
-
     def __bool__(self):
         tmp = len([x for x in self.value if not isinstance(x, Reference)])
         return bool(tmp)
+
+    # region algebra
 
     def __add__(self, other):
         other = EntityValue.from_value(other)
@@ -113,101 +138,161 @@ class EntityValue:
         combinations = itertools.product(self.value, power.value)
         return EntityValue.from_value({x**y for x, y in combinations})
 
+    # endregion
+
+    # region comparison
+
     def __eq__(self, other):
-        if not isinstance(other, EntityValue):
-            return false_value
-        if self.value == other.value:
-            return self or true_value
-        return false_value
+        return process_entity_value_equality(self, other)
 
     def __ne__(self, other):
-        if not isinstance(other, EntityValue):
-            return self or true_value
-        if self.value == other.value:
+        tmp = self == other
+        if tmp:
             return false_value
-        return self or other or true_value
+        return self or true_value
 
     def __lt__(self, other):
-        if len(self.value) < len(other.value):
-            return other or true_value
-        elif len(self.value) > len(other.value):
-            return false_value
-
-        result = set()
-        for x, y in itertools.product(self.value, other.value):
-            result.add(x < y)
-
-        if all(result):
-            return self or true_value
-        return false_value
+        return process_entity_value_comparison(self, other, lambda x, y: x < y)
 
     def __le__(self, other):
-        if len(self.value) < len(other.value):
-            return other or true_value
-        elif len(self.value) > len(other.value):
-            return false_value
-
-        result = set()
-        for x, y in itertools.product(self.value, other.value):
-            result.add(x <= y)
-
-        if all(result):
-            return self or true_value
-        return false_value
+        return process_entity_value_comparison(self, other, lambda x, y: x <= y)
 
     def __gt__(self, other: 'EntityValue'):
-        if not other:
-            return self or true_value
-        if other and not self:
-            return false_value
-
-        comparisons = set(itertools.product(self.value, other.value))
-        gt_results = set()
-        inequalities = set()
-        for x, y in comparisons:
-            comp = x > y
-            match comp:
-                case False:
-                    continue
-                case True:
-                    gt_results.add(x)
-                case Relational():
-                    inequalities.add(comp)
-
-        if inequalities:
-            return false_value
-
-        if len(gt_results) / len(comparisons) > 0.5:
-            return ev_fv(gt_results)
-        return false_value
+        return process_entity_value_comparison(self, other, lambda x, y: x > y)
 
     def __ge__(self, other):
-        if len(self.value) > len(other.value):
-            return other or true_value
-        elif len(self.value) < len(other.value):
-            return false_value
+        return process_entity_value_comparison(self, other, lambda x, y: x >= y)
 
-        result = set()
-        for x, y in itertools.product(self.value, other.value):
-            result.add(x >= y)
+    # endregion
 
-        if all(result):
-            return self or true_value
+
+def process_entity_value_equality(x: EntityValue, y: EntityValue) -> EntityValue:
+    if not x and not y:
+        return true_value
+    if not x or not y:
         return false_value
 
-    def __iter__(self):
-        return iter(self.value)
+    inequality = set()
 
-    @property
-    def expressions(self) -> FrozenSet[Expr]:
-        return frozenset(x for x in self.value if isinstance(x, Expr))
+    intersection = x.value & y.value
+    left_over = (x.value | y.value) - intersection
 
-    def with_p(self, p: float) -> 'EntityValue':
-        return dataclasses.replace(self, p=p)
+    all_relationals = {a for a in left_over if isinstance(a, Relational)}
 
+    all_refs = {a for a in left_over if isinstance(a, Ref)}
+
+    x_comparable = x.value - intersection - all_refs - all_relationals
+    y_comparable = y.value - intersection - all_refs - all_relationals
+
+    if len(x_comparable) != len(y_comparable):
+        return false_value
+
+    all_eqs = set(itertools.product(x_comparable, y_comparable))
+
+    eq_results = set()
+
+    # region strict equality pass
+
+    tmp = {(x, y) for x, y in all_eqs if x == y is True or (x == y) == BooleanTrue()}
+    tmp = set(itertools.chain(*tmp))
+    eq_results |= tmp
+
+    # endregion
+
+    # region symbolic equality pass
+
+    all_equalities = {(x, y, Eq(x, y)) for x, y in all_eqs if x not in eq_results and y not in eq_results}
+    for value_a, value_b, eq in all_equalities:
+        match eq:
+            case Eq():
+                eq_results.add(eq)
+            case BooleanTrue():
+                eq_results |= {value_a, value_b}
+            case BooleanFalse():
+                return false_value
+
+    # endregion
+
+    all_relationals_reduced = simplify_relational_set(frozenset(all_relationals))
+    if all_relationals_reduced is False:
+        return false_value
+
+    final_result_set = intersection | all_relationals_reduced | eq_results | all_refs
+    return EntityValue.from_value(final_result_set)
+
+
+def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, threshold=0.5) -> EntityValue:
+    # a comparison produces a value comprised of all of the components of the two values that meet the
+    # condition provided.  The resulting entityvalue has a p that reflects the number of pootential  comparisons
+    # that met the condition (right now the default is 0.5, if the p is below that, false_value is returrned)
+    # when two values are compared, in order to be truthy, all of the relationals created by th ecomparrisons must be
+    # true, ootherwise we would advance a known false hypothesis.
+    #  when a conditiono results in a relational it is added to the result.
+    #  references are ignored
+
+    # this is a dumb truthtable, I need to think this through better
+    match x, y:
+        case a, b if not a and not b and comparison(0, 0):
+            return x | true_value
+        case a, b if not a and not b:
+            return false_value
+        case _, b if not b and comparison(1, 0):
+            return x | true_value
+        case _, b if not b:
+            return false_value
+        case a, _ if not a and comparison(0, 1):
+            return true_value
+        case a, _ if not a:
+            return false_value
+
+    x_relational = {a for a in x if isinstance(a, Relational)}
+    y_relational = {a for a in y if isinstance(a, Relational)}
+    all_relationals = x_relational | y_relational
+
+    x_has_true = {a for a in x if a is True or a is BooleanTrue()}
+    y_has_true = {a for a in y if a is True or a is BooleanTrue()}
+
+    if x_has_true:
+        x = ev_fv({a for a in x if a is not True and a is not BooleanTrue()})
+    if y_has_true:
+        y = ev_fv({a for a in y if a is not True and a is not BooleanTrue()})
+
+    x_refs = {a for a in x if isinstance(a, Ref)}
+    y_refs = {a for a in y if isinstance(a, Ref)}
+
+    x_comparable = x.value - x_relational - x_refs
+    y_comparable = y.value - y_relational - y_refs
+    y_comparable = y_comparable or {0}
+
+    comparison_product = {(x, y, comparison(x, y)) for x, y in itertools.product(x_comparable, y_comparable)}
+
+    total_true = 0
+    total_count = 0
+    out_set = set()
+    for value, _, result in comparison_product:
+        total_count += 1
+        match result:
+            case Relational():
+                all_relationals.add(result)
+            case x if not x:
+                continue
+        out_set.add(value)
+        total_true += 1
+
+    all_relationals_reduced = simplify_relational_set(frozenset(all_relationals))
+    if all_relationals_reduced is False:
+        return false_value
+
+    p = (total_true / total_count) if total_count else 1
+    if p < threshold:
+        return false_value
+
+    new_values = x_comparable | all_relationals_reduced | x_refs
+
+    return EntityValue(new_values, p)
 
 
 ev_fv = EntityValue.from_value
 
-true_value = EntityValue.from_value(1)
+true_value = EntityValue.from_value(True)
 false_value = EntityValue()

@@ -23,6 +23,15 @@ def qne(arg: Any):
 def test_query_expression_parser():
 
     expectations = {
+        "* | !<trigger>": QueryExpression(
+            (
+                qre('*'),
+                qne(quick_parse(TriggerExpression, '<trigger>'))
+            ),
+            (
+                QueryOperator('|'),
+            )
+        ),
         "first & !(second ^ third) - 4 * 5 | sixth": QueryExpression(
             (
                 qre('first'),
@@ -95,15 +104,7 @@ def test_query_expression_parser():
                 QueryOperator('|')
             )
         ),
-        "* | !<trigger>": QueryExpression(
-            (
-                qre('void'),
-                qne(quick_parse(TriggerExpression, '<trigger>'))
-            ),
-            (
-                QueryOperator('|'),
-            )
-        ),
+
         "state & <trigger>": QueryExpression(
             (
                 qre('state'),

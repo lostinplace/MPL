@@ -65,6 +65,10 @@ def simplify_single_expression(expr: Expr | Relational, context: EngineContext) 
             ref = Reference.decode(symbol)
             value = context[ref]
 
+            value_refs = value.references
+            result |= value_refs
+            value = value.value - value_refs
+
             if symbol in context.symbols and not value:
                 # if it's a symbol that is marked as symbol in context, and it has no value,
                 # then it can be left alone

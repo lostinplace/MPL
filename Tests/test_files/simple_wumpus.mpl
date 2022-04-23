@@ -14,9 +14,9 @@ Wumpus: machine
         Near Prey: state
         Smell Prey: state
         <Enter Strike Zone> ~> Near Prey
-        <Exit Strike Zone> ~> Near Prey -> *
+        <Exit Strike Zone> ~> Near Prey -> 0
         Distance To Prey < Smell Range -> Smell Prey
-        Distance To Prey > Smell Range -> Smell Prey -> *
+        Distance To Prey > Smell Range -> Smell Prey -> 0
         Smell Prey & !Feel Secure ~> Wander -> Flee
         Smell Prey & Feel Secure ~> Wander -> Hunt
     !Mindset.Feel Secure & !Mindset.Smell Prey & Health.Hurt ~> Activity.Flee -> Activity.Recover
@@ -28,7 +28,7 @@ Wumpus: machine
     Activity.Recover ~> Health.Hurt -> Health.Ok
     Health.Hurt & <Turn Ended> ~@ Turns Wounded += 1
     Health.Hurt ~> Mindset.Feel Secure -> %{10} -> Mindset.Feel Secure
-    Health.Hurt ~> Mindset.Feel Secure -> %{Turns Wounded} -> *
+    Health.Hurt ~> Mindset.Feel Secure -> %{Turns Wounded} -> 0
     Health.Ok & <Turn Ended> ~> Turns Wounded > 0 ~@ Turns Wounded -= 1
     Mindset.* & Health.Ok ~> Mindset.Feel Secure
     Mindset.Near Prey & !Mindset.Feel Secure ~> Activity.Attack -> Activity.Flee

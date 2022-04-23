@@ -1,10 +1,9 @@
 from parsita import Success
 
 from mpl.Parser.ExpressionParsers.arithmetic_expression_parser import ArithmeticExpression
-from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
+from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, VectorExpression
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpression, ScenarioExpressionParsers as parser
 from Tests import collect_parsing_expectations, quick_parse
-from mpl.Parser.ExpressionParsers.vector_expression_parser import VectorExpression
 
 
 def test_scenario_expression_parsers():

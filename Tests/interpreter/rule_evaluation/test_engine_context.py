@@ -2,10 +2,10 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.expression_evaluation.interpreters import ExpressionInterpreter
+from mpl.interpreter.expression_evaluation.interpreters.expression_interpreter import ExpressionInterpreter
 
 from mpl.lib import fs
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
 
 
 def test_context_generation_from_expressions():
@@ -30,6 +30,7 @@ def test_context_generation_from_expressions():
 
     for expr_input, expected in expectations.items():
         rule = quick_parse(RuleExpression, expr_input)
+        expected = EngineContext.from_dict(expected)
         expression = rule.clauses[0]
         interpreter = ExpressionInterpreter.from_expression(expression)
         references = interpreter.references
@@ -43,10 +44,10 @@ def test_context_generation_from_rules():
 
     expectations = {
         'a & b -> c -> d': {
-            Ref('a'): EntityValue(frozenset()),
-            Ref('b'): EntityValue(frozenset()),
-            Ref('c'): EntityValue(frozenset()),
-            Ref('d'): EntityValue(frozenset()),
+            Ref('a'): EntityValue(),
+            Ref('b'): EntityValue(),
+            Ref('c'): EntityValue(),
+            Ref('d'): EntityValue(),
         },
     }
 
@@ -54,6 +55,7 @@ def test_context_generation_from_rules():
         rule = quick_parse(RuleExpression, rule_input)
         interpreter = RuleInterpreter.from_expression(rule)
         actual = EngineContext.from_interpreter(interpreter)
+        expected = EngineContext.from_dict(expected)
         assert actual == expected
 
 
@@ -61,26 +63,25 @@ def test_context_activation():
     from Tests import quick_parse
 
     expectations = {
-        ('test  & something complex ^ `with a string` + ok', fs('something complex'), None): {
-            Ref('test'): EntityValue(frozenset([hash(Ref('test'))])),
-            Ref('something complex'):
-                EntityValue.from_value(hash(Ref('something complex'))),
-            Ref('ok'): EntityValue(frozenset()),
+        ('test & something complex ^ `with a string` + ok', fs('something complex'), None): {
+            Ref('test'): ev_fv(),
+            Ref('something complex'): ev_fv(True),
+            Ref('ok'): ev_fv(),
         },
         ('a & b', 'a', None): {
-            Ref('a'): EntityValue(frozenset([hash(Ref('a'))])),
-            Ref('b'): EntityValue(frozenset()),
+            Ref('a'): ev_fv(True),
+            Ref('b'): ev_fv(),
         },
         ('test  & something ^ not me', Ref('test'), None): {
-            Ref('test'): EntityValue(frozenset([hash(Ref('test'))])),
+            Ref('test'): ev_fv(True),
             Ref('something'): EntityValue(frozenset()),
             Ref('not me'): EntityValue(frozenset()),
         },
         ('test  & something ^ not me | complicated', fs(Ref('test'), 'complicated'), 'ok'): {
-            Ref('test'): EntityValue(fs('ok')),
-            Ref('something'): EntityValue(frozenset()),
-            Ref('not me'): EntityValue(frozenset()),
-            Ref('complicated'): EntityValue(fs('ok')),
+            Ref('test'): ev_fv('ok'),
+            Ref('something'): ev_fv(),
+            Ref('not me'): ev_fv(),
+            Ref('complicated'): ev_fv('ok'),
         },
     }
 
@@ -90,5 +91,6 @@ def test_context_activation():
         interpreter = ExpressionInterpreter.from_expression(expression)
         references = interpreter.references
         context = EngineContext.from_references(references)
-        actual = context.activate(ref_input, ref_value)
+        expected = EngineContext.from_dict(expected)
+        actual, changes = context.activate(ref_input, ref_value)
         assert actual == expected

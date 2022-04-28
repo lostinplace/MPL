@@ -7,7 +7,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference, 
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 
 from mpl.interpreter.rule_evaluation import RuleInterpretation, RuleInterpretationState, create_rule_interpreter
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, ev_fv, false_value, true_value
 from mpl.lib import fs
 from mpl.lib.context_tree.context_tree_implementation import ContextTree
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
@@ -73,6 +73,11 @@ def test_evaluate_rule():
                 Reference('d.*'): quick_change(True, {}),
             },
             source='b.* -> d',
+            core_state_assertions={
+                Reference('b.*'): 'CONSUME',
+                Reference('d'): 'TARGET',
+            },
+            scenarios=fs(1)
         ),
         ('Recover ~> Hurt -> Ok', contexts['recovery']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
@@ -82,17 +87,29 @@ def test_evaluate_rule():
                 Reference('Ok'): quick_change({}, True),
                 Reference('Ok.*'): quick_change(True, {}),
             },
-            source='Recover ~> Hurt -> Ok'
+            source='Recover ~> Hurt -> Ok',
+            scenarios=fs(1),
+            core_state_assertions={
+                Reference('Hurt'): 'CONSUME',
+                Reference('Ok'): 'TARGET',
+            }
+
         ),
         ('!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure', contexts['fleeing wumpus']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
             {
                 Reference('noise'): quick_change({}, symbols('`safe`')),
                 Reference('noise.*'): quick_change(True, {}),
-                Reference('Feel Secure'): quick_change({}, 1),
+                Reference('Feel Secure'): quick_change({}, True),
                 Reference('Feel Secure.*'): quick_change(True, {}),
             },
-            source='!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure'
+            source='!Smell Prey & Flee ~@ noise = `safe` ~> Feel Secure',
+            scenarios=fs(1),
+            core_state_assertions={
+                Reference('noise'): 'TARGET',
+                Reference('noise.*'): 'TARGET',
+                Reference('Feel Secure'): 'TARGET',
+            }
         ),
         ('<Enter Strike Zone> ~> %{9} -> Feel Secure -> Attack', contexts['simpler wumpus']):
             RuleInterpretation(
@@ -103,8 +120,12 @@ def test_evaluate_rule():
                     Reference('Attack.*'): quick_change(True, {}),
                     Reference('Attack'): quick_change({}, {9, Ref('Feel Secure'), 12}),
                 },
+                source='<Enter Strike Zone> ~> %{9} -> Feel Secure -> Attack',
                 scenarios=ev_fv(9),
-                source='<Enter Strike Zone> ~> %{9} -> Feel Secure -> Attack'
+                core_state_assertions={
+                    Reference('Feel Secure'): 'CONSUME',
+                    Reference('Attack'): 'TARGET',
+                }
             ),
         ('a -> b', contexts['simple']): RuleInterpretation(
             RuleInterpretationState.APPLICABLE,
@@ -114,17 +135,32 @@ def test_evaluate_rule():
                 Reference('b'): quick_change(0, 1),
                 Reference('b.*'): quick_change(1, 0),
             },
-            source='a -> b'
+            source='a -> b',
+            scenarios=fs(1),
+            core_state_assertions={
+                Reference('a'): 'CONSUME',
+                Reference('b'): 'TARGET',
+            }
         ),
         ('b -> a', contexts['simple']): RuleInterpretation(RuleInterpretationState.NOT_APPLICABLE, {}, source='b -> a'),
-        ('a -> c -> b', contexts['simple with c and d']): RuleInterpretation(RuleInterpretationState.APPLICABLE, {
-            Reference('a'): quick_change(1, 0),
-            Reference('a.*'): quick_change(0, True),
-            Reference('b'): quick_change(0, {1, 123, Ref('a'), Ref('b')}),
-            Reference('b.*'): quick_change(True, 0),
-            Reference('c'): quick_change(123, 0),
-            Reference('c.*'): quick_change(0, True),
-        }, source='a -> c -> b'),
+        ('a -> c -> b', contexts['simple with c and d']): RuleInterpretation(
+            RuleInterpretationState.APPLICABLE,
+            {
+                Reference('a'): quick_change(1, 0),
+                Reference('a.*'): quick_change(0, True),
+                Reference('b'): quick_change(0, {1, 123, Ref('a'), Ref('b')}),
+                Reference('b.*'): quick_change(True, 0),
+                Reference('c'): quick_change(123, 0),
+                Reference('c.*'): quick_change(0, True),
+            },
+            source='a -> c -> b',
+            scenarios=fs(1),
+            core_state_assertions={
+                Reference('a'): 'CONSUME',
+                Reference('c'): 'CONSUME',
+                Reference('b'): 'TARGET',
+            }
+        ),
     }
 
     for (rule, context), expected in expectations.items():

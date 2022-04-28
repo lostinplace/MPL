@@ -6,7 +6,7 @@ from prompt_toolkit import HTML
 
 from Tests import quick_parse
 from mpl.Parser.ExpressionParsers.assignment_expression_parser import AssignmentExpression
-from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref
+from mpl.Parser.ExpressionParsers.reference_expression_parser import Ref, SRef
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.interpreter.expression_evaluation.entity_value import ev_fv
 from mpl.interpreter.rule_evaluation.mpl_engine import MPLEngine
@@ -71,8 +71,7 @@ def test_command_sequences():
         {
             'load Tests/test_files/simplest.mpl': None,
             '+Three': {
-                Ref('Three'): (ev_fv(), ev_fv(True)),
-                Ref('Three.*'): (ev_fv(True), ev_fv()),
+                SRef('Three'): (ev_fv(3), ev_fv(True)),
             },
             'clear context': None,
             '?': {}
@@ -114,8 +113,8 @@ def test_command_sequences():
         engine.add(expressions)
         for command, expected in command_sequence.items():
             result = execute_command(engine, command)
-            equality = result == expected
-            assert expected is None or equality, command
+            if expected is not None:
+                assert result == expected, command
 
 
 def test_basic_command_parsing():

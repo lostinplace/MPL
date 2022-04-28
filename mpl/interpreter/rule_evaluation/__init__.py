@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from itertools import zip_longest
 from numbers import Number
-from typing import Tuple, FrozenSet, Optional, List, Dict
+from typing import Tuple, FrozenSet, Optional, List, Dict, Any
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
 from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
 from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext
-from mpl.interpreter.expression_evaluation.entity_value import EntityValue
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue, false_value
 from mpl.interpreter.expression_evaluation.interpreters.assignment_expression_interpreter import AssignmentResult
 from mpl.interpreter.expression_evaluation.interpreters.create_expression_interpreter import \
     create_expression_interpreter
@@ -37,6 +37,7 @@ class RuleInterpretation:
     changes: Dict[Reference | str, Tuple[EntityValue, EntityValue]]
     source: str = ''
     scenarios: FrozenSet[ScenarioResult] = frozenset()
+    core_state_assertions: Dict[Reference, str | EntityValue] = dataclasses.field(default_factory=dict)
 
     @property
     def scenario_weight(self) -> int:
@@ -48,7 +49,7 @@ class RuleInterpretation:
                 case Number() as x:
                     total_weight += x
 
-        return total_weight or 1
+        return total_weight
 
     @property
     def keys(self) -> FrozenSet[Reference]:
@@ -60,14 +61,22 @@ class RuleInterpretation:
     def __repr__(self):
         tmp = [f'{k}:{v0}->{v1}' for k, (v0, v1) in sorted(self.changes.items(), key=lambda x: x[0])]
         changes_formatted = ', '.join(tmp)
-        return f'Interpretation({self.source}, changes={changes_formatted})'
+        assertions_str = ', '.join(f'{k}:{v}' for k, v in sorted(self.core_state_assertions.items(), key=lambda x: x[0]))
+        return f'Interpretation({self.source}, changes={changes_formatted}, assertions={assertions_str})'
 
 
 def compress_result_cache(result_cache: List[EntityValue]) -> EntityValue:
     result = EntityValue()
     for value in result_cache:
-        result |= value
+        tmp = {x for x in value if not isinstance(x, Reference)}
+        result |= tmp
     return result.clean
+
+
+def collect_strong_assertions(refs: FrozenSet[Reference], value: EntityValue|str) -> Dict[Reference, EntityValue]:
+    return {
+        k: value for k in refs
+    }
 
 
 def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterpreter], expression: RuleExpression) \
@@ -88,7 +97,10 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
     result_cache = []
     all_changes = {}
 
+    core_state_assertions = {}
+
     scenarios = frozenset()
+    scenario_count = 0
     for interpreter, operator in operation_pairs:
         result = interpreter.interpret(result_context)
 
@@ -97,21 +109,29 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
                 return RuleInterpretation(RuleInterpretationState.NOT_APPLICABLE, {}, this_name)
             case QueryResult(), MPLOperator(_, 'CONSUME', __, _):
                 result_context, changes = result_context.clear(result.value.references)
+                core_state_assertions |= collect_strong_assertions(
+                    result.value.references,
+                    'CONSUME'
+                )
                 all_changes |= changes
                 result_cache.append(result.value)
             case QueryResult(), MPLOperator(_, 'OBSERVE', __, _):
                 result_cache.append(EntityValue.from_value(True))
             case AssignmentResult() as x, None:
                 result_context, changes = result_context.update(x.change)
+                for k, v in x.change.items():
+                    core_state_assertions[k] = 'TARGET'
                 all_changes |= changes
             case AssignmentResult() as x, MPLOperator(_, 'OBSERVE', __, _):
                 result_context, changes = result_context.update(x.change)
+                for k, v in x.change.items():
+                    core_state_assertions[k] = 'TARGET'
                 all_changes |= changes
                 result_cache.append(EntityValue.from_value(True))
             case AssignmentResult() as x, MPLOperator(_, 'CONSUME', __, _):
                 result_context, changes = result_context.update(x.change)
-                all_changes |= changes
-                result_context, changes = result_context.clear(x.change.references)
+                for k, v in x.change.items():
+                    core_state_assertions[k] = 'TARGET'
                 all_changes |= changes
                 result_cache.append(x.value)
             case ScenarioResult() as x, MPLOperator(_, 'CONSUME', __, _):
@@ -119,18 +139,30 @@ def interpret(self, context: EngineContext, interpreters: Tuple[ExpressionInterp
                 #  to indicate the selection.  This means that scenario results need to track the clause they originated
                 #  from, but that means a better reference graph.  I'll come back to it later
                 scenarios |= x.value
+                scenario_count += 1
                 result_cache.append(x.value)
             case ScenarioResult() as x, MPLOperator(_, 'OBSERVE', __, _):
                 scenarios |= x.value
+                scenario_count += 1
                 result_cache.append(EntityValue.from_value(True))
             case TargetResult() as x, None:
                 target_refs = x.value.references
                 target_value = compress_result_cache(result_cache)
+                core_state_assertions |= collect_strong_assertions(target_refs, 'TARGET')
                 target_changes = {ref: target_value for ref in target_refs}
                 result_context, changes = result_context.update(target_changes)
                 all_changes |= changes
 
-    return RuleInterpretation(RuleInterpretationState.APPLICABLE, all_changes, this_name, scenarios)
+    if scenario_count == 0:
+        scenarios = frozenset({1})
+
+    return RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        all_changes,
+        this_name,
+        scenarios,
+        core_state_assertions
+    )
 
 
 @dataclass(frozen=True, order=True)

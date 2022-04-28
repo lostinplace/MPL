@@ -69,7 +69,7 @@ class MPLEngine:
         if result.state != RuleInterpretationState.APPLICABLE:
             return dict()
         conflicts = identify_conflicts(fs(result))
-        resolved = resolve_conflict_map(conflicts, 1)
+        resolved = resolve_conflict_map(conflicts)
         resolved_changes = compress_interpretations(resolved)
         context, changes = context.update(resolved_changes)
         all_changes |= changes
@@ -83,7 +83,7 @@ class MPLEngine:
         if not applicable:
             return dict()
         conflicts = identify_conflicts(applicable)
-        resolved = resolve_conflict_map(conflicts, seed)
+        resolved = resolve_conflict_map(conflicts)
         resolved_changes = compress_interpretations(resolved)
         self.context, changes = self.context.update(resolved_changes)
         return changes

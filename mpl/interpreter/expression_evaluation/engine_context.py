@@ -16,7 +16,8 @@ context_diff = Dict[str, Tuple[Optional[EntityValue], Optional[EntityValue]]]
 def quick_diff(changes: Dict[Reference, EntityValue], old_context: ContextTree) -> context_diff:
     return {
         name: (old_context[name], changes.get(name))
-        for name in changes if name != Reference.ROOT()
+        for name in changes \
+            if name != Reference.ROOT() and hash(old_context[name]) != hash(changes.get(name))
     }
 
 

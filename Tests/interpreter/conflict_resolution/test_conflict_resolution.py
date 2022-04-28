@@ -166,7 +166,7 @@ def test_conflict_resolution_doesnt_break():
 
     conflicts = identify_conflicts(interpretations)
     for i in range(5000):
-        actual = resolve_conflict_map(conflicts, i)
+        actual = resolve_conflict_map(conflicts)
         affected_keys = set()
         for c in actual:
             intersection = affected_keys & c.keys

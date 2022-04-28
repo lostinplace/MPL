@@ -43,6 +43,10 @@ class EntityValue:
                 return None
 
     @property
+    def without_references(self) -> 'EntityValue':
+        return ev_fv({x for x in self.value if not isinstance(x, Reference)})
+
+    @property
     def references(self) -> FrozenSet[Reference]:
         return frozenset({x for x in self.value if isinstance(x, Reference)})
 
@@ -143,6 +147,8 @@ class EntityValue:
     # region comparison
 
     def __eq__(self, other):
+        if not isinstance(other, EntityValue):
+            return False
         return process_entity_value_equality(self, other)
 
     def __ne__(self, other):
@@ -230,23 +236,9 @@ def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, 
     #  when a conditiono results in a relational it is added to the result.
     #  references are ignored
 
-    # this is a dumb truthtable, I need to think this through better
-    match x, y:
-        case a, b if not a and not b and comparison(0, 0):
-            return x | true_value
-        case a, b if not a and not b:
-            return false_value
-        case _, b if not b and comparison(1, 0):
-            return x | true_value
-        case _, b if not b:
-            return false_value
-        case a, _ if not a and comparison(0, 1):
-            return true_value
-        case a, _ if not a:
-            return false_value
-
     x_relational = {a for a in x if isinstance(a, Relational)}
     y_relational = {a for a in y if isinstance(a, Relational)}
+
     all_relationals = x_relational | y_relational
 
     x_has_true = {a for a in x if a is True or a is BooleanTrue()}
@@ -260,9 +252,8 @@ def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, 
     x_refs = {a for a in x if isinstance(a, Ref)}
     y_refs = {a for a in y if isinstance(a, Ref)}
 
-    x_comparable = x.value - x_relational - x_refs
-    y_comparable = y.value - y_relational - y_refs
-    y_comparable = y_comparable or {0}
+    x_comparable = (x.value - x_relational - x_refs) or {0}
+    y_comparable = (y.value - y_relational - y_refs) or {0}
 
     comparison_product = {(x, y, comparison(x, y)) for x, y in itertools.product(x_comparable, y_comparable)}
 
@@ -276,7 +267,7 @@ def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, 
                 all_relationals.add(result)
             case x if not x:
                 continue
-        out_set.add(value)
+        out_set.add(value or True)
         total_true += 1
 
     all_relationals_reduced = simplify_relational_set(frozenset(all_relationals))
@@ -287,6 +278,7 @@ def process_entity_value_comparison(x: EntityValue, y: EntityValue, comparison, 
     if p < threshold:
         return false_value
 
+    x_comparable = {True} if x_comparable == {0} else x_comparable
     new_values = x_comparable | all_relationals_reduced | x_refs
 
     return EntityValue(new_values, p)

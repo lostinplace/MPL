@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Dict
+from typing import Dict, Tuple
 
 from sympy import symbols
 
@@ -246,14 +246,63 @@ def test_change_node():
 
 
 def test_conflict_resolution_chain():
-    def generate_conflict_dict(keys: set[str]) -> Dict[Reference, EntityValue]:
-        return {key: EntityValue.from_value(1) for key in keys}
+    def generate_conflict_dict(keys: set[str]) -> Dict[Reference, Tuple[EntityValue, EntityValue]]:
+        return {key: (ev_fv(), EntityValue.from_value(1)) for key in keys}
 
-    a = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'a', 'b', 'c'}), 'a->b-c')
-    b = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'c', 'd', 'e'}), 'c->d->e')
-    c = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'e', 'f', 'g'}), 'e->f->g')
-    d = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'h', 'i'}), 'h->i')
-    e = RuleInterpretation(RuleInterpretationState.APPLICABLE, generate_conflict_dict({'a', 'c', 'e'}), 'a->c->e')
+    a = RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        generate_conflict_dict({'a', 'b', 'c'}),
+        'a->b-c',
+        fs(1),
+        {
+            Ref('a'): 'CONSUME',
+            Ref('b'): 'CONSUME',
+            Ref('c'): 'TARGET',
+        }
+    )
+    b = RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        generate_conflict_dict({'c', 'd', 'e'}),
+        'c->d->e',
+        fs(1),
+        {
+            Ref('c'): 'CONSUME',
+            Ref('d'): 'CONSUME',
+            Ref('e'): 'TARGET',
+        }
+    )
+    c = RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        generate_conflict_dict({'e', 'f', 'g'}),
+        'e->f->g',
+        fs(1),
+        {
+            Ref('e'): 'CONSUME',
+            Ref('f'): 'CONSUME',
+            Ref('g'): 'TARGET',
+        }
+    )
+    d = RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        generate_conflict_dict({'h', 'i'}),
+        'h->i',
+        fs(1),
+        {
+            Ref('h'): 'CONSUME',
+            Ref('i'): 'TARGET',
+        }
+    )
+    e = RuleInterpretation(
+        RuleInterpretationState.APPLICABLE,
+        generate_conflict_dict({'a', 'c', 'e'}),
+        'a->c->e',
+        fs(1),
+        {
+            Ref('a'): 'CONSUME',
+            Ref('c'): 'CONSUME',
+            Ref('e'): 'TARGET',
+        }
+    )
 
     interpretations = frozenset({a, b, c, d, e})
 

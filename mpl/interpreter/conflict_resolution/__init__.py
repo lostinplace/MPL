@@ -1,11 +1,13 @@
 import dataclasses
 import random
+from enum import Enum, auto
 
-from typing import List, Set, FrozenSet, Dict
+from typing import List, Set, FrozenSet, Dict, Tuple, Union
 
 import networkx as nx
 
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
+from mpl.interpreter.expression_evaluation.entity_value import EntityValue
 from mpl.interpreter.rule_evaluation import RuleInterpretation, RuleInterpretationState
 
 
@@ -36,47 +38,119 @@ class InterpretationChoices:
     Rejected: FrozenSet[RuleInterpretation] = frozenset()
 
 
-def identify_conflicts(interpretations: FrozenSet[RuleInterpretation]) \
-        -> Dict[RuleInterpretation, FrozenSet[RuleInterpretation]]:
-    affected_keys = set()
-    interp_index = dict()
+def construct_change_graph(interpretations: FrozenSet[RuleInterpretation]) \
+        -> Tuple[nx.DiGraph, Dict[int, RuleInterpretation]]:
+    graph = nx.DiGraph()
 
-    tmp_graph = nx.DiGraph()
+    interp_index = dict()
 
     for interp in interpretations:
         if interp.state == RuleInterpretationState.NOT_APPLICABLE:
             continue
-        affected_keys |= interp.changes.keys()
         interp_key = hash(interp)
         interp_index[interp_key] = interp
         for changed_key in interp.keys:
-            tmp_graph.add_edge(interp_key, changed_key)
+            graph.add_edge(interp_key, changed_key)
 
-    out = {}
+    return graph, interp_index
 
-    for interp in interpretations:
+
+def drop_non_competitive_interpretations(target: RuleInterpretation, candidates: FrozenSet[RuleInterpretation]) \
+        -> FrozenSet[RuleInterpretation]:
+    result = set()
+    for candidate in candidates:
+        if candidate.state == RuleInterpretationState.NOT_APPLICABLE:
+            continue
+        for change in candidate.changes:
+            if change not in target.changes:
+                continue
+            if target.changes[change] == candidate.changes[change]:
+                continue
+            result.add(candidate)
+
+    return frozenset(result)
+
+
+class InterpretationRequirementType(Enum):
+    DONT_CHANGE = auto()
+    VOID = auto()
+
+
+def generate_interpretation_requirements(target: RuleInterpretation) \
+        -> Dict[Reference, Union['EntityValue', InterpretationRequirementType]]:
+    result = {}
+    for k, _ in target.changes.items():
+        result[k] = 'ADJUST'
+
+    return result | target.core_state_assertions
+
+
+def detect_conflict(target: RuleInterpretation, candidate: RuleInterpretation) -> FrozenSet[Reference]:
+    if not target.state == candidate.state == RuleInterpretationState.APPLICABLE:
+        return frozenset()
+
+    target_requirements = generate_interpretation_requirements(target)
+    candidate_requirements = generate_interpretation_requirements(candidate)
+
+    result = set()
+
+    for k, v in target_requirements.items():
+        other_v = candidate_requirements.get(k, None)
+        match v, other_v:
+            case 'TARGET' | 'CONSUME', None:
+                continue
+            case 'TARGET' | 'CONSUME', y:
+                result.add(k)
+            case x, 'TARGET' | 'CONSUME':
+                result.add(k)
+
+    return frozenset(result)
+
+
+def construct_conflict_map(change_graph: nx.DiGraph, interp_index: Dict[int, RuleInterpretation]) \
+        -> Dict[RuleInterpretation, FrozenSet[RuleInterpretation]]:
+    result = {}
+
+    for k, interp in interp_index.items():
         if interp.state == RuleInterpretationState.NOT_APPLICABLE:
             continue
 
         changed_keys = interp.keys
-        changed_key_nodes = tmp_graph.nbunch_iter(changed_keys)
-        changed_by = set()
-        for node in changed_key_nodes:
-            tmp = set(tmp_graph.predecessors(node))
-            changed_by |= tmp
+        other_interps = set()
+        for key in changed_keys:
+            tmp = set(change_graph.predecessors(key))
+            other_interps |= tmp
 
-        result = changed_by - {hash(interp)}
-        result = {interp_index[x] for x in result}
-        out[interp] = frozenset(result)
+        conflicts = set()
 
-    return out
+        for node in other_interps:
+            other_interp = interp_index[node]
+            if other_interp.state == RuleInterpretationState.NOT_APPLICABLE:
+                continue
+            if other_interp == interp:
+                continue
+            conflict_keys = detect_conflict(interp, other_interp)
+            if conflict_keys:
+                conflicts.add(other_interp)
+
+        result[interp] = frozenset(conflicts)
+
+    return result
+
+
+def identify_conflicts(interpretations: FrozenSet[RuleInterpretation]) \
+        -> Dict[RuleInterpretation, FrozenSet[RuleInterpretation]]:
+
+    tmp_graph, interp_index = construct_change_graph(interpretations)
+    result = construct_conflict_map(tmp_graph, interp_index)
+
+    return result
 
 
 def choose_outcome(
         target: RuleInterpretation,
         conflict_map: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]],
-        existing_choices: InterpretationChoices,
-        seed) -> InterpretationChoices:
+        existing_choices: InterpretationChoices) -> InterpretationChoices:
 
     if target in existing_choices.Rejected:
         return existing_choices
@@ -97,11 +171,16 @@ def choose_outcome(
         return dataclasses.replace(existing_choices, Accepted=new_acceptance)
 
     rc_list = list(remaining_conflicts)
-    rc_weights = [x.scenario_weight for x in rc_list]
+    rc_weights = [x.scenario_weight for x in rc_list] or [0]
 
     candidates = [target] + rc_list
+
     weights = [target.scenario_weight] + rc_weights
-    # random.seed(seed)
+
+    #protection from zeroes
+    if weights == [weights[0]] * len(weights):
+        weights = [1] * len(weights)
+
     choice = random.choices(candidates, weights=weights, k=1)[0]
 
     new_acceptance = existing_choices.Accepted | {choice}
@@ -112,12 +191,11 @@ def choose_outcome(
 
 
 def resolve_conflict_map(
-        conflict_map: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]],
-        seed) -> FrozenSet[RuleInterpretation]:
+        conflict_map: Dict[RuleInterpretation, FrozenSet[RuleInterpretation]]) -> FrozenSet[RuleInterpretation]:
     out = InterpretationChoices()
     sorted_keys = sorted(conflict_map.keys(), key=lambda x: len(conflict_map[x]))
     for k in sorted_keys:
-        out = choose_outcome(k, conflict_map, out, seed)
+        out = choose_outcome(k, conflict_map, out)
     return out.Accepted
 
 
@@ -134,7 +212,7 @@ def get_resolutions(conflicts: Dict[RuleInterpretation, FrozenSet[RuleInterpreta
     resolution_tracker = defaultdict(lambda: 0)
     random.seed(0)
     for x in range(trials):
-        resolved = resolve_conflict_map(conflicts, x)
+        resolved = resolve_conflict_map(conflicts)
         resolution_tracker[resolved] += 1
         resolution_tracker['total'] += 1
 

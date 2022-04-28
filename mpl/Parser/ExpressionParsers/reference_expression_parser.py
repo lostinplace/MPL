@@ -154,8 +154,17 @@ class Reference:
                 return EntityValue(frozenset({x}))
 
 
-
 Ref = Reference
+
+
+def SRef(name: str) -> 'Reference':
+    return Reference(name, frozenset(['state']))
+
+
+def qref(name: str, type_name: str = '') -> 'Reference':
+    if type_name:
+        return Reference(name, frozenset({type_name}))
+    return Reference(name)
 
 
 @dataclass(frozen=True, order=True)

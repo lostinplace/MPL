@@ -4,21 +4,25 @@ flashlight: machine
         off
 
     battery: machine
-        presence: state
-            in
-            out
-        working
+        inserted: state
+            yes
+            no -> *
+        inserted -> inserted.yes
+
         charge: state
-            empty
             low
             ok
             empty -> *
-        level
-        level > 1 ~> charge.ok
-        1 > level ~> level > 0 ~> charge.low
-        level <= 0 ~> charge.empty
-        <Beam> -> level = level - 0.1
 
-    power.on & battery.presence.in & battery.working & charge ~> <Beam>
+        inserted & level > 1 ~> charge.ok
+        inserted & level < 1 ~> level > 0 ~> charge.low
+        inserted ~> level <= 0 ~> charge.empty
+        <Beam> ~> level = level - 0.1
+
+    broken: state
+
+    power.on & battery.inserted & !broken & battery.charge ~> <Beam>
+    <Beam> -> %{0} -> 0
+
 
 

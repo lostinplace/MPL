@@ -8,11 +8,12 @@ flashlight: machine
             yes
             no -> *
         inserted -> inserted.yes
+        !inserted ~> level.* & charge.*
 
         charge: state
             low
             ok
-            empty -> *
+            empty
 
         inserted & level > 1 ~> charge.ok
         inserted & level < 1 ~> level > 0 ~> charge.low
@@ -21,8 +22,7 @@ flashlight: machine
 
     broken: state
 
-    power.on & battery.inserted & !broken & battery.charge ~> <Beam>
-    <Beam> -> %{0} -> 0
+    power.on & battery.inserted & !broken & !battery.charge.empty ~> <Beam>
 
 
 

@@ -6,14 +6,15 @@ from networkx import MultiDiGraph
 
 from mpl.Parser.ExpressionParsers.machine_expression_parser import MachineFile
 from mpl.Parser.ExpressionParsers.reference_expression_parser import Reference
-from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression
+from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, RuleExpressionParsers
 from mpl.interpreter.conflict_resolution import identify_conflicts, compress_interpretations, \
     resolve_conflict_map
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph, \
     construct_graph_from_expressions
-from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation
+from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation, \
+    create_rule_interpreter
 from mpl.lib import fs
 from mpl.lib.graph_operations import combine_graphs, drop_from_graph
 
@@ -82,7 +83,8 @@ class MPLEngine:
         applicable = frozenset({x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE})
         if not applicable:
             return dict()
-        conflicts = identify_conflicts(applicable)
+        trigger_nullifiers = get_trigger_nullifiers(self)
+        conflicts = identify_conflicts(applicable | trigger_nullifiers)
         resolved = resolve_conflict_map(conflicts)
         resolved_changes = compress_interpretations(resolved)
         self.context, changes = self.context.update(resolved_changes)
@@ -145,3 +147,28 @@ class MPLEngine:
 
     def __str__(self):
         return f'MPLEngine({self.context}, {self.rule_interpreters}, {self.history})'
+
+
+def get_trigger_nullifiers(engine: MPLEngine) -> FrozenSet[RuleInterpretation]:
+    from mpl.interpreter.expression_evaluation.interpreters.scenario_expression_interpreter import ScenarioResult
+    from mpl.interpreter.expression_evaluation.entity_value import false_value
+    from mpl.interpreter.expression_evaluation.entity_value import true_value
+    result = set()
+    for ref in engine.context.active:
+        if 'trigger' in ref.types:
+            sr = {ScenarioResult(false_value)}
+            tmp = RuleInterpretation(
+                RuleInterpretationState.APPLICABLE,
+                {
+                    ref: false_value,
+                    ref.void: true_value
+                },
+                f'{ref}::%{{0}}→0',
+                frozenset(sr),
+                {
+                    ref.void: 'TARGET',
+                    ref: 'CONSUME'
+                },
+            )
+            result.add(tmp)
+    return frozenset(result)

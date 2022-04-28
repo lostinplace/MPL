@@ -135,6 +135,13 @@ def test_flashlight():
     execute_command(engine, '.')
     tmp = execute_command(engine, '?flashlight.battery.charge.empty')
     assert tmp == {
+        Ref('flashlight.battery.charge.empty'): ev_fv(),
+    }
+    execute_command(engine, '+flashlight.battery.inserted')
+    execute_command(engine, '.')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?flashlight.battery.charge.empty')
+    assert tmp == {
         Ref('flashlight.battery.charge.empty'): ev_fv(True),
     }
     execute_command(engine, 'flashlight.battery.level = 0.5')
@@ -157,5 +164,20 @@ def test_flashlight():
     assert tmp == {
         Ref('flashlight.battery.charge.low'): ev_fv(),
     }
+    execute_command(engine, 'flashlight.battery.level = 0.5')
+    execute_command(engine, '+flashlight.power.on')
+    execute_command(engine, '.')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?Beam')
+    assert tmp == {
+        Ref('Beam'): ev_fv(True),
+    }
+    execute_command(engine, '+flashlight.broken')
+    execute_command(engine, '.')
+    tmp = execute_command(engine, '?Beam')
+    assert tmp == {
+        Ref('Beam'): ev_fv(),
+    }
+
 
 

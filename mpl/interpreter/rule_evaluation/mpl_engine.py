@@ -10,9 +10,10 @@ from mpl.Parser.ExpressionParsers.rule_expression_parser import RuleExpression, 
 from mpl.interpreter.conflict_resolution import identify_conflicts, compress_interpretations, \
     resolve_conflict_map
 from mpl.interpreter.expression_evaluation.engine_context import EngineContext, context_diff
+from mpl.interpreter.expression_evaluation.entity_value import false_value
 
 from mpl.interpreter.reference_resolution.mpl_ontology import process_machine_file, rule_expressions_from_graph, \
-    construct_graph_from_expressions
+    construct_graph_from_expressions, Relationship
 from mpl.interpreter.rule_evaluation import RuleInterpreter, RuleInterpretationState, RuleInterpretation, \
     create_rule_interpreter
 from mpl.lib import fs
@@ -77,17 +78,35 @@ class MPLEngine:
         self.history = (all_changes,) + self.history
         return all_changes
 
+    def get_invalidated_triggers(self, interpretations: FrozenSet[RuleInterpretation]) -> \
+            Dict[Reference, Tuple['EntityValue', 'EntityValue']]:
+
+        active_triggers = {}
+        for interp in interpretations:
+            for ref in interp.core_state_assertions:
+                types = self.get_types(ref)
+                if 'trigger' in types:
+                    active_triggers[ref.name] = interp.core_state_assertions[ref]
+        result = {}
+        for ref in self.active:
+            if 'trigger' in ref.types and not active_triggers.get(ref.name):
+                result[ref] = self.context[ref], false_value
+        return result
+
+
     def execute_interpreters(self, interpreters: FrozenSet[RuleInterpreter], seed=1) -> context_diff:
 
         interpretations = {interpreter.interpret(self.context) for interpreter in interpreters}
         applicable = frozenset({x for x in interpretations if x.state == RuleInterpretationState.APPLICABLE})
         if not applicable:
             return dict()
-        trigger_nullifiers = get_trigger_nullifiers(self)
-        conflicts = identify_conflicts(applicable | trigger_nullifiers)
+        # trigger_nullifiers = get_trigger_nullifiers(self)
+        conflicts = identify_conflicts(applicable)
         resolved = resolve_conflict_map(conflicts)
+        invalidated_triggers = self.get_invalidated_triggers(resolved)
         resolved_changes = compress_interpretations(resolved)
-        self.context, changes = self.context.update(resolved_changes)
+        all_changes = resolved_changes | invalidated_triggers
+        self.context, changes = self.context.update(all_changes)
         return changes
 
     def tick(self, count: int = 1) -> context_diff:
@@ -123,7 +142,6 @@ class MPLEngine:
         return fs(interpretation)
 
     def activate(self, ref: Reference | Set[Reference],  value: Any = None) -> context_diff:
-
         self.context, changes = self.context.activate(ref, value)
         return changes
 
@@ -134,6 +152,11 @@ class MPLEngine:
     def query(self, ref: Reference) -> 'EntityValue':
         value = self.context[ref]
         return value
+
+    def get_types(self, ref: Reference) -> FrozenSet[str]:
+        tmp = self.graph.out_edges(ref.without_types, data='relationship')
+        result = {ref_type for ref, ref_type, edge in tmp if edge == Relationship.IS_A}
+        return frozenset(result)
 
     @property
     def active(self) -> Dict[Reference, 'EntityValue']:

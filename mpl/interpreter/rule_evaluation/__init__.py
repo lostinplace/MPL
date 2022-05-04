@@ -56,7 +56,15 @@ class RuleInterpretation:
         return frozenset(self.changes.keys())
 
     def __hash__(self):
-        return hash((self.state, tuple(self.changes.items()), self.scenarios))
+        return hash(
+            (
+                self.source,
+                self.state,
+                frozenset(self.changes.items()),
+                frozenset(self.core_state_assertions.items()),
+                self.scenarios
+            )
+        )
 
     def __repr__(self):
         tmp = [f'{k}:{v0}->{v1}' for k, (v0, v1) in sorted(self.changes.items(), key=lambda x: x[0])]

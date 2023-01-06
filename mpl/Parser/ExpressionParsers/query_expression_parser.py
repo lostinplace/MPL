@@ -113,6 +113,11 @@ class QueryExpression(Expression):
         new_operands = tuple(x.unqualify(context, ignore_types) for x in self.operands)
         return QueryExpression(new_operands, self.operators)
 
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...]) -> 'QueryExpression':
+        new_operands = tuple(x.requalify(old_context, new_context) for x in self.operands)
+        return QueryExpression(new_operands, self.operators)
+
+
     @staticmethod
     def interpret(parser_results: SeparatedList | Negation):
         match parser_results:
@@ -133,6 +138,10 @@ class QueryExpression(Expression):
         tmp = QueryExpressionParsers.expression.parse(text)
         assert isinstance(tmp, Success)
         return tmp.value
+
+    def __invert__(self):
+        from Tests.exploration.test_thing import Observe
+        return Observe(self)
 
 
 class QueryExpressionParsers(TextParsers, whitespace=r'[ \t]*'):

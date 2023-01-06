@@ -10,8 +10,6 @@ from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression
 
 @dataclass(frozen=True, order=True)
 class ScenarioExpression(Expression):
-    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ScenarioExpression':
-        return ScenarioExpression(self.value.unqualify(context, ignore_types))
 
     value: QueryExpression
 
@@ -24,6 +22,12 @@ class ScenarioExpression(Expression):
 
     def qualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ScenarioExpression':
         return ScenarioExpression(self.value.qualify(context, ignore_types))
+
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> 'ScenarioExpression':
+        return ScenarioExpression(self.value.unqualify(context, ignore_types))
+
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...]) -> 'ScenarioExpression':
+        return ScenarioExpression(self.value.requalify(old_context, new_context))
 
     @staticmethod
     def interpret(value: VectorExpression) -> 'ScenarioExpression':

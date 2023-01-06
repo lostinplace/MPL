@@ -20,7 +20,8 @@ class MPLOperator:
 
 
 class MPLOperators:
-    CONSUME_LEFT = MPLOperator(None, '-', '>')
+    CONSUME_LEFT = MPLOperator(None, 'CONSUME', 'STATE')
+    OBSERVE_LEFT = MPLOperator(None, 'OBSERVE', 'STATE')
 
 S = {
     'ANY': None,

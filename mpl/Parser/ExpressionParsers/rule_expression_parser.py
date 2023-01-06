@@ -11,7 +11,7 @@ from mpl.Parser.ExpressionParsers.reference_expression_parser import ReferenceEx
 from mpl.Parser.ExpressionParsers.scenario_expression_parser import ScenarioExpressionParsers as ScExP, \
     ScenarioExpression
 from mpl.Parser.ExpressionParsers.query_expression_parser import QueryExpression, QueryExpressionParsers as QExP
-from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator, MPLOperatorParsers as MOPs
+from mpl.Parser.Tokenizers.operator_tokenizers import MPLOperator, MPLOperatorParsers as MOPs, MPLOperators
 from mpl.lib.parsers.additive_parsers import track
 from mpl.lib.parsers.custom_parsers import back
 from mpl.lib.parsers.repsep2 import repsep2, SeparatedList
@@ -60,11 +60,24 @@ class RuleExpression(Expression):
             operators=self.operators
         )
 
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...]) -> 'RuleExpression':
+        import dataclasses
+
+        new_parent = self.parent.requalify(old_context, new_context) if self.parent else None
+        new_clauses = (x.requalify(old_context, new_context) for x in self.clauses)
+        return dataclasses.replace(self, parent=new_parent, clauses=tuple(new_clauses))
+
     @property
     def reference_expressions(self) -> FrozenSet[ReferenceExpression]:
         result = frozenset()
         for clause in self.clauses:
             result |= clause.reference_expressions
+        return result
+
+    def __rshift__(self, other):
+        from Tests.exploration.test_thing import rule_combine, add_rule_to_cache
+        result = rule_combine(self, other, MPLOperators.CONSUME_LEFT)
+        add_rule_to_cache(result)
         return result
 
 

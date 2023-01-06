@@ -65,6 +65,14 @@ class ArithmeticExpression(Expression):
         )
         return ArithmeticExpression(new_operands, self.operators)
 
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...]) -> 'ArithmeticExpression':
+        new_operands = tuple(
+            operand.requalify(old_context, new_context)
+            if isinstance(operand, (ReferenceExpression, ArithmeticExpression)) else operand
+            for operand in self.operands
+        )
+        return ArithmeticExpression(new_operands, self.operators)
+
     @staticmethod
     def interpret(parser_results: SeparatedList) -> 'ArithmeticExpression':
         operands = tuple(parser_results)

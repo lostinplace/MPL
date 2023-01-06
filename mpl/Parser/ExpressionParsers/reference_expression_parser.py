@@ -214,6 +214,11 @@ class ReferenceExpression:
             return ReferenceExpression(self.path[len(context):], self.types if not ignore_types else frozenset())
         return self
 
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...], ignore_types: bool = False) -> 'ReferenceExpression':
+        if self.path[:len(old_context)] == old_context:
+            return ReferenceExpression(new_context + self.path[len(old_context):], self.types if not ignore_types else frozenset())
+        return self
+
     @property
     def reference_expressions(self) -> FrozenSet['ReferenceExpression']:
         return frozenset({self})

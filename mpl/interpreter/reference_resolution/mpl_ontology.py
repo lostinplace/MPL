@@ -156,6 +156,7 @@ def assign_missing_parents(G: MultiDiGraph) -> MultiDiGraph:
 
 
 def process_machine_file(file: MachineFile) -> (EngineContext, MultiDiGraph, Set):
+    # I can create an MPL Engine from just a graph
     with_parentage = assign_parentage_from_machine_file(file)
     graph = construct_graph_from_expressions(with_parentage)
     graph = assign_missing_parents(graph)

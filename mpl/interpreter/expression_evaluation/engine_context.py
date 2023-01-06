@@ -24,7 +24,7 @@ def quick_diff(changes: Dict[Reference, EntityValue], old_context: ContextTree) 
 @dataclasses.dataclass
 class EngineContext:
     """
-    EngineContext are immutable, any time you omake a change, you receive a new context along with the change manifest
+    EngineContext are immutable, any time you make a change, you receive a new context along with the change manifest
     """
     tree: ContextTree = dataclasses.field(default_factory=ContextTree)
 

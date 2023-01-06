@@ -17,10 +17,6 @@ from mpl.Parser.Tokenizers.operator_tokenizers import AssignmentOperator, Assign
 
 @dataclass(frozen=True, order=True)
 class AssignmentExpression(Expression):
-    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> T:
-        new_lhs = self.lhs.unqualify(context, ignore_types)
-        new_rhs = self.rhs.unqualify(context, ignore_types)
-        return replace(self, lhs=new_lhs, rhs=new_rhs)
 
     lhs: ReferenceExpression
     rhs: QueryExpression
@@ -36,6 +32,16 @@ class AssignmentExpression(Expression):
     def qualify(self, context: typing.Tuple[str, ...], ignore_types: bool = False) -> 'AssignmentExpression':
         new_lhs = self.lhs.qualify(context, ignore_types)
         new_rhs = self.rhs.qualify(context, ignore_types)
+        return replace(self, lhs=new_lhs, rhs=new_rhs)
+
+    def unqualify(self, context: Tuple[str, ...], ignore_types: bool = False) -> T:
+        new_lhs = self.lhs.unqualify(context, ignore_types)
+        new_rhs = self.rhs.unqualify(context, ignore_types)
+        return replace(self, lhs=new_lhs, rhs=new_rhs)
+
+    def requalify(self, old_context: Tuple[str, ...], new_context: Tuple[str, ...]) -> T:
+        new_lhs = self.lhs.requalify(old_context, new_context)
+        new_rhs = self.rhs.requalify(old_context, new_context)
         return replace(self, lhs=new_lhs, rhs=new_rhs)
 
     @staticmethod
